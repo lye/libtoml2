@@ -671,8 +671,148 @@ toml2_lex_double(toml2_lex_t *lex, toml2_token_t *tok, size_t len)
 static int
 toml2_lex_date(toml2_lex_t *lex, toml2_token_t *tok, size_t len)
 {
-	lex->err.err = TOML2_INVALID_DATE;
-	return 1; // TODO
+	enum mode_t {
+		MODE_YEAR,
+		MODE_MONTH,
+		MODE_DAY,
+		MODE_HOUR,
+		MODE_MINUTE,
+		MODE_SECOND,
+		MODE_NANOSECOND,
+		MODE_OFF_HOUR,
+		MODE_OFF_MINUTE,
+		MODE_DONE,
+	}
+	mode = MODE_YEAR;
+
+	int32_t val = 0, spare = 0, sign = 1;
+	size_t num_digits = 0;
+	UChar ch = 0, prev_ch;
+
+	bzero(&tok->time, sizeof(struct tm));
+
+	// XXX: This could just be implemented as a state table, but alas.
+#	define NEXT_MODE(NEXT, FIELD, NUM_DIGIT) \
+		if (0 < NUM_DIGIT && NUM_DIGIT != num_digits) { \
+			lex->err.err = TOML2_INVALID_DATE; \
+			return 1; \
+		} \
+		num_digits = 0; \
+		spare = 0; \
+		FIELD = val; \
+		val = 0; \
+		mode = NEXT; \
+		continue
+
+	for (size_t i = 0; i < len; i += 1) {
+		prev_ch = ch;
+		ch = toml2_lex_peek(lex, i);
+
+		if ('-' == ch) {
+			if (MODE_YEAR == mode) {
+				NEXT_MODE(MODE_MONTH, tok->time.tm_year, 4);
+			}
+
+			if (MODE_MONTH == mode) {
+				val -= 1; // erhgh
+				NEXT_MODE(MODE_DAY, tok->time.tm_mon, 2);
+			}
+
+			if (MODE_SECOND == mode) {
+				sign = -1;
+				NEXT_MODE(MODE_OFF_HOUR, tok->time.tm_sec, 2);
+			}
+
+			if (MODE_NANOSECOND == mode) {
+				sign = -1;
+				NEXT_MODE(MODE_OFF_HOUR, spare, 0);
+			}
+		}
+
+		if ('+' == ch) {
+			if (MODE_SECOND == mode) {
+				NEXT_MODE(MODE_OFF_HOUR, tok->time.tm_sec, 2);
+			}
+
+			if (MODE_NANOSECOND == mode) {
+				NEXT_MODE(MODE_OFF_HOUR, spare, 0);
+			}
+		}
+
+		if ('T' == ch || 't' == ch) {
+			if (MODE_DAY == mode) {
+				NEXT_MODE(MODE_HOUR, tok->time.tm_mday, 2);
+			}
+		}
+
+		if ('Z' == ch || 'z' == ch) {
+			if (MODE_SECOND == mode) {
+				NEXT_MODE(MODE_DONE, tok->time.tm_sec, 2);
+			}
+
+			if (MODE_NANOSECOND == mode) {
+				NEXT_MODE(MODE_DONE, spare, 0);
+			}
+		}
+
+		if (':' == ch) {
+			if (MODE_HOUR == mode) {
+				NEXT_MODE(MODE_MINUTE, tok->time.tm_hour, 2);
+			}
+
+			if (MODE_MINUTE == mode) {
+				NEXT_MODE(MODE_SECOND, tok->time.tm_min, 2);
+			}
+
+			if (MODE_OFF_HOUR == mode) {
+				NEXT_MODE(MODE_OFF_MINUTE, spare, 2);
+			}
+		}
+
+		if ('.' == ch) {
+			if (MODE_SECOND == mode) {
+				NEXT_MODE(MODE_NANOSECOND, tok->time.tm_sec, 0);
+			}
+		}
+
+		if ('0' <= ch && '9' >= ch) {
+			val *= 10;
+			val += ch - '0';
+			num_digits += 1;
+			continue;
+		}
+
+		lex->err.err = TOML2_INVALID_DATE;
+		return 1;
+	}
+
+	for (size_t i = 0; i < 1; i += 1) {
+		switch (mode) {
+			case MODE_DAY: NEXT_MODE(MODE_DONE, tok->time.tm_mday, 2);
+			case MODE_SECOND: NEXT_MODE(MODE_DONE, tok->time.tm_sec, 2);
+			case MODE_NANOSECOND: NEXT_MODE(MODE_DONE, spare, 0);
+
+			case MODE_OFF_MINUTE:
+				if (2 != num_digits) {
+					break;
+				}
+
+				tok->time.tm_gmtoff = sign * ((60 * 60 * spare) + val);
+				mode = MODE_DONE;
+				break;
+
+			default: break;
+		}
+	}
+	if (MODE_DONE != mode) {
+		lex->err.err = TOML2_INVALID_DATE;
+		return 1;
+	}
+#	undef NEXT_MODE
+
+	toml2_lex_emit(lex, tok, len, TOML2_TOKEN_DATE);
+	toml2_lex_advance_n(lex, len);
+	return 0;
 }
 
 static int
@@ -688,7 +828,7 @@ toml2_lex_value(toml2_lex_t *lex, toml2_token_t *tok)
 		prev_ch = ch;
 		ch = toml2_lex_peek(lex, pos);
 
-		if ('-' == ch || 'T' == ch) {
+		if ('-' == ch) {
 			// A date has a '-' anywhere in it, except as the first character
 			// (which is valid for ints+doubles) or after an 'eE' (which is
 			// valid for a double as well). Both of the latter cases are
@@ -696,6 +836,10 @@ toml2_lex_value(toml2_lex_t *lex, toml2_token_t *tok)
 			if (pos != 0 && prev_ch !=  'e' && prev_ch != 'E') {
 				type = TOML2_TOKEN_DATE;
 			}
+		}
+		else if ('t' == ch || 'T' == ch || 'z' == ch || 'Z' == ch || ':' == ch) {
+			// Date-only chars.
+			type = TOML2_TOKEN_DATE;
 		}
 		else if ('e' == ch || 'E' == ch || '.' == ch) {
 			// A '.' can appear in both dates and doubles -- the dates will

@@ -3,6 +3,7 @@
 #include <unicode/utypes.h>
 #include <unicode/uchar.h>
 #include <unicode/ustring.h>
+#include <time.h>
 
 // toml2_lex_t encapsulates both the decoded UTF8 buffer and the current
 // lexer state for an in-progress lex. The lexer is currently streaming --
@@ -69,6 +70,7 @@ typedef struct {
 	union {
 		int64_t ival;
 		double fval;
+		struct tm time;
 	};
 }
 toml2_token_t;

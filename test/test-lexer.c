@@ -568,6 +568,99 @@ START_TEST(err_fval_neg2)
 }
 END_TEST
 
+START_TEST(date)
+{
+	toml2_lex_t lexer = check_init("1928-01-02T12:04:06-08:12");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DATE);
+	ck_assert_int_eq(1928, tok.time.tm_year);
+	ck_assert_int_eq(0, tok.time.tm_mon);
+	ck_assert_int_eq(2, tok.time.tm_mday);
+	ck_assert_int_eq(12, tok.time.tm_hour);
+	ck_assert_int_eq(4, tok.time.tm_min);
+	ck_assert_int_eq(6, tok.time.tm_sec);
+	ck_assert_int_eq(-1 * (8 * 60 * 60 + 12), tok.time.tm_gmtoff);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(date2)
+{
+	toml2_lex_t lexer = check_init("2001-02-03t04:05:06.789Z");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DATE);
+	ck_assert_int_eq(2001, tok.time.tm_year);
+	ck_assert_int_eq(1, tok.time.tm_mon);
+	ck_assert_int_eq(3, tok.time.tm_mday);
+	ck_assert_int_eq(4, tok.time.tm_hour);
+	ck_assert_int_eq(5, tok.time.tm_min);
+	ck_assert_int_eq(6, tok.time.tm_sec);
+	ck_assert_int_eq(0, tok.time.tm_gmtoff);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(date_short)
+{
+	toml2_lex_t lexer = check_init("2001-02-03");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DATE);
+	ck_assert_int_eq(2001, tok.time.tm_year);
+	ck_assert_int_eq(1, tok.time.tm_mon);
+	ck_assert_int_eq(3, tok.time.tm_mday);
+	ck_assert_int_eq(0, tok.time.tm_hour);
+	ck_assert_int_eq(0, tok.time.tm_min);
+	ck_assert_int_eq(0, tok.time.tm_sec);
+	ck_assert_int_eq(0, tok.time.tm_gmtoff);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_date_short)
+{
+	const char *tests[] = {
+		"2001-",
+		"2001-02",
+		"2001-02-",
+		"2001-02-03T",
+		"2001-02-03T05",
+		"2001-02-03T05:",
+		"2001-02-03T05:06",
+		"2001-02-03T05:06:",
+		"2001-02-03T05:06:07",
+		"2001-02-03T05:06:07.",
+		"2001-02-03T05:06:07T",
+		"2001-02-03T05:06:07T08",
+		"2001-02-03T05:06:07T08:",
+		"201-02-03T04:05:06Z",
+		"2001-2-03T04:05:06Z",
+		"2001-02-3T04:05:06Z",
+		"2001-02-03T4:05:06Z",
+		"2001-02-03T04:5:06Z",
+		"2001-02-03T04:05:6Z",
+		"2001-02-03T04:05:06T7:08",
+		"2001-02-03T04:05:06T07:8",
+	};
+	for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i += 1) {
+		toml2_lex_t lexer = check_init(tests[i]);
+		toml2_token_t tok;
+
+		if (1 != toml2_lex_token(&lexer, &tok)) {
+			ck_assert_msg("Assertion: '%s' should fail to lex", tests[i]);
+		}
+		if (TOML2_INVALID_DATE != lexer.err.err) {
+			ck_assert_msg(
+				"Assertion: '%s' should return TOML2_INVALID_DATE (got %d)",
+				tests[i],
+				lexer.err.err
+			);
+		}
+
+		toml2_lex_free(&lexer);
+	}
+}
+END_TEST
+
 Suite*
 suite_lexer()
 {
@@ -628,6 +721,10 @@ suite_lexer()
 		{ "err_fval_e_us2",   &err_fval_e_us2   },
 		{ "err_fval_ee",      &err_fval_ee      },
 		{ "err_fval_neg2",    &err_fval_neg2    },
+		{ "date",             &date             },
+		{ "date2",            &date2            },
+		{ "date_short",       &date_short       },
+		{ "err_date_short",   &err_date_short   },
 	};
 
 	return tcase_build_suite("lexer", tests, sizeof(tests));
