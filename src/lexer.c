@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <math.h>
 
 typedef int (*toml2_lex_fn)(toml2_lex_t*, toml2_token_t*, uint32_t); 
 
@@ -413,7 +414,7 @@ toml2_lex_tquote(toml2_lex_t *lex, toml2_token_t *tok, uint32_t flags)
 			return 1;
 		}
 
-		if (ch == '\n') {
+		if ('\n' == ch) {
 			lex->line += 1;
 			lex->col = 1;
 		} else {
@@ -552,12 +553,125 @@ toml2_lex_int(toml2_lex_t *lex, toml2_token_t *tok, size_t len)
 static int
 toml2_lex_double(toml2_lex_t *lex, toml2_token_t *tok, size_t len)
 {
-	return 1; // TODO
+	// NOTE: This implementation explicitly does not use strtod because it
+	// needs to be locale-independent; the behavior of strtod varies by locale.
+	// There's probably a better way to implement this but I'm too lazy to 
+	// re-read IEEE754 to make a bit-twiddly version.
+
+	double val = 0;
+	double exponent = 0;
+	double sign = 1;
+	double sign_exp = 1;
+	double relpos = 0;
+	bool prev_number = false;
+	enum {
+		MODE_INTEGER,
+		MODE_FRACTION,
+		MODE_EXPONENT,
+	}
+	mode = MODE_INTEGER;
+
+	UChar ch;
+
+	for (size_t pos = 0; pos < len; pos += 1) {
+		ch = toml2_lex_peek(lex, pos);
+
+		if (relpos == 0 && '-' == ch && mode != MODE_FRACTION) {
+			if (MODE_INTEGER == mode) {
+				sign = -1;
+			}
+			else if (MODE_EXPONENT == mode) {
+				sign_exp = -1;
+			}
+			continue;
+		}
+
+		if ('.' == ch) {
+			if (mode != MODE_INTEGER || 0 == pos) {
+				lex->err.err = TOML2_INVALID_DOUBLE;
+				return 1;
+			}
+			if (!prev_number) {
+				lex->err.err = TOML2_INVALID_UNDERSCORE;
+				return 1;
+			}
+
+			mode = MODE_FRACTION;
+			prev_number = false;
+			relpos = 0;
+			continue;
+		}
+
+		if ('e' == ch || 'E' == ch) {
+			if (mode != MODE_INTEGER && mode != MODE_FRACTION) {
+				lex->err.err = TOML2_INVALID_DOUBLE;
+				return 1;
+			}
+			if (!prev_number) {
+				lex->err.err = TOML2_INVALID_UNDERSCORE;
+				return 1;
+			}
+
+			mode = MODE_EXPONENT;
+			prev_number = false;
+			relpos = 0;
+			continue;
+		}
+
+		if ('_' == ch) {
+			if (!prev_number) {
+				lex->err.err = TOML2_INVALID_UNDERSCORE;
+				return 1;
+			}
+
+			prev_number = false;
+			continue;
+		}
+
+		if ('0' <= ch && '9' >= ch) {
+			switch (mode) {
+				case MODE_INTEGER:
+					val *= 10;
+					val += ch - '0';
+					break;
+
+				case MODE_FRACTION:
+					val += ((double) (ch - '0')) / ((relpos + 1) * 10);
+					break;
+
+				case MODE_EXPONENT:
+					exponent *= 10;
+					exponent += ch - '0';
+					break;
+			}
+
+			relpos += 1;
+			prev_number = true;
+			continue;
+		}
+
+		lex->err.err = TOML2_INVALID_DOUBLE;
+		return 1;
+	}
+	if ('_' == ch) {
+		lex->err.err = TOML2_INVALID_UNDERSCORE;
+		return 1;
+	}
+
+	val *= sign;
+	exponent *= sign_exp;
+
+	toml2_lex_emit(lex, tok, len, TOML2_TOKEN_DOUBLE);
+	tok->fval = val * pow(10, exponent);
+	toml2_lex_advance_n(lex, len);
+
+	return 0;
 }
 
 static int
 toml2_lex_date(toml2_lex_t *lex, toml2_token_t *tok, size_t len)
 {
+	lex->err.err = TOML2_INVALID_DATE;
 	return 1; // TODO
 }
 
@@ -568,18 +682,25 @@ toml2_lex_value(toml2_lex_t *lex, toml2_token_t *tok)
 	size_t pos = 0;
 	toml2_token_type_t type = TOML2_TOKEN_INT;
 
+	UChar ch = 0, prev_ch;
+
 	for (;; pos += 1) {
-		UChar ch = toml2_lex_peek(lex, pos);
+		prev_ch = ch;
+		ch = toml2_lex_peek(lex, pos);
 
 		if ('-' == ch || 'T' == ch) {
-			if (pos != 0) {
+			// A date has a '-' anywhere in it, except as the first character
+			// (which is valid for ints+doubles) or after an 'eE' (which is
+			// valid for a double as well). Both of the latter cases are
+			// invalid dates.
+			if (pos != 0 && prev_ch !=  'e' && prev_ch != 'E') {
 				type = TOML2_TOKEN_DATE;
 			}
 		}
 		else if ('e' == ch || 'E' == ch || '.' == ch) {
 			// A '.' can appear in both dates and doubles -- the dates will
 			// always have it appear after '-', so give it higher points.
-			if (type == TOML2_TOKEN_DATE) {
+			if (type != TOML2_TOKEN_DATE) {
 				type = TOML2_TOKEN_DOUBLE;
 			}
 		}

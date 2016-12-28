@@ -392,6 +392,182 @@ START_TEST(err_ival_last_us)
 }
 END_TEST
 
+START_TEST(err_ival_neg)
+{
+	toml2_lex_t lexer = check_init("4-2");
+	check_token_err(&lexer, TOML2_INVALID_INT);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_ival_neg2)
+{
+	toml2_lex_t lexer = check_init("--42");
+	check_token_err(&lexer, TOML2_INVALID_DATE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(fval)
+{
+	toml2_lex_t lexer = check_init("42.");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DOUBLE);
+	ck_assert_double_eq(42, tok.fval);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(fval_us)
+{
+	toml2_lex_t lexer = check_init("4_2.");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DOUBLE);
+	ck_assert_double_eq(42, tok.fval);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(fval_e)
+{
+	toml2_lex_t lexer = check_init("4e2");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DOUBLE);
+	ck_assert_double_eq(4e2, tok.fval);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(fval_e2)
+{
+	toml2_lex_t lexer = check_init("4E2");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DOUBLE);
+	ck_assert_double_eq(4e2, tok.fval);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(fval_d)
+{
+	toml2_lex_t lexer = check_init("4.2");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DOUBLE);
+	ck_assert_double_eq(4.2, tok.fval);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(fval_de)
+{
+	toml2_lex_t lexer = check_init("4.2e2");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DOUBLE);
+	ck_assert_double_eq(420, tok.fval);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(fval_neg)
+{
+	toml2_lex_t lexer = check_init("-4.2");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DOUBLE);
+	ck_assert_double_eq(-4.2, tok.fval);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(fval_neg_e)
+{
+	toml2_lex_t lexer = check_init("40e-1");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DOUBLE);
+	ck_assert_double_eq(4, tok.fval);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_fval_neg_f)
+{
+	toml2_lex_t lexer = check_init("4.-2");
+	check_token_err(&lexer, TOML2_INVALID_DATE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_fval_us)
+{
+	toml2_lex_t lexer = check_init("4__2.");
+	check_token_err(&lexer, TOML2_INVALID_UNDERSCORE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_fval_last_us)
+{
+	toml2_lex_t lexer = check_init("4.2_");
+	check_token_err(&lexer, TOML2_INVALID_UNDERSCORE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_fval_mid_us)
+{
+	toml2_lex_t lexer = check_init("4_.2");
+	check_token_err(&lexer, TOML2_INVALID_UNDERSCORE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_fval_mid_us2)
+{
+	toml2_lex_t lexer = check_init("4._2");
+	check_token_err(&lexer, TOML2_INVALID_UNDERSCORE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_fval_end_us)
+{
+	toml2_lex_t lexer = check_init("4.2_");
+	check_token_err(&lexer, TOML2_INVALID_UNDERSCORE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_fval_e_us)
+{
+	toml2_lex_t lexer = check_init("4_e1");
+	check_token_err(&lexer, TOML2_INVALID_UNDERSCORE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_fval_e_us2)
+{
+	toml2_lex_t lexer = check_init("4e_1");
+	check_token_err(&lexer, TOML2_INVALID_UNDERSCORE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_fval_ee)
+{
+	toml2_lex_t lexer = check_init("4ee2");
+	check_token_err(&lexer, TOML2_INVALID_DOUBLE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_fval_neg2)
+{
+	toml2_lex_t lexer = check_init("--4.");
+	check_token_err(&lexer, TOML2_INVALID_DATE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
 Suite*
 suite_lexer()
 {
@@ -433,6 +609,25 @@ suite_lexer()
 		{ "ival_space_nl",    &ival_space_nl    },
 		{ "err_ival_us",      &err_ival_us      },
 		{ "err_ival_last_us", &err_ival_last_us },
+		{ "err_ival_neg2",    &err_ival_neg2    },
+		{ "fval",             &fval             },
+		{ "fval_us",          &fval_us          },
+		{ "fval_e",           &fval_e           },
+		{ "fval_e2",          &fval_e2          },
+		{ "fval_d",           &fval_d           },
+		{ "fval_de",          &fval_de          },
+		{ "fval_neg",         &fval_neg         },
+		{ "fval_neg_e",       &fval_neg_e       },
+		{ "err_fval_neg_f",   &err_fval_neg_f   },
+		{ "err_fval_us",      &err_fval_us      },
+		{ "err_fval_last_us", &err_fval_last_us },
+		{ "err_fval_mid_us",  &err_fval_mid_us  },
+		{ "err_fval_mid_us2", &err_fval_mid_us2 },
+		{ "err_fval_end_us",  &err_fval_end_us  },
+		{ "err_fval_e_us",    &err_fval_e_us    },
+		{ "err_fval_e_us2",   &err_fval_e_us2   },
+		{ "err_fval_ee",      &err_fval_ee      },
+		{ "err_fval_neg2",    &err_fval_neg2    },
 	};
 
 	return tcase_build_suite("lexer", tests, sizeof(tests));
