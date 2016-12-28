@@ -142,13 +142,19 @@ toml2_lex_emit(
 	return 0;
 }
 
+static bool
+toml2_is_whitespace(UChar ch)
+{
+	return ' ' == ch || '\r' == ch || '\t' == ch;
+}
+
 static void
 toml2_lex_eat_whitespace(toml2_lex_t *lex)
 {
 	while (lex->buf_left > 0) {
 		UChar p = lex->buf[0];
 
-		if (' ' != p && '\r' != p && '\t' != p) {
+		if (!toml2_is_whitespace(p)) {
 			break;
 		}
 
@@ -305,7 +311,7 @@ toml2_lex_quote(toml2_lex_t *lex, toml2_token_t *tok, uint32_t flags)
 {
 	// Consume until we hit EOF (error), NL (error) or a close quote.
 	// When !TOML2_QUOTE_SINGLE, we need to be aware of escaped quotes.
-	const char q = flags == TOML2_QUOTE_SINGLE ? '\'' : '"';
+	const char q = (flags & TOML2_QUOTE_SINGLE) ? '\'' : '"';
 
 	size_t len = 0;
 	bool escape = false;
@@ -366,13 +372,104 @@ toml2_lex_quote(toml2_lex_t *lex, toml2_token_t *tok, uint32_t flags)
 static int
 toml2_lex_tquote(toml2_lex_t *lex, toml2_token_t *tok, uint32_t flags)
 {
-	return 1; // TODO
+	toml2_lex_advance_n(lex, 3);
+
+	const char q = (flags & TOML2_QUOTE_SINGLE) ? '\'' : '"';
+	
+	// If the first character is a newline or a backspace+newline, trim off
+	// the leading whitespace.
+	UChar ch = toml2_lex_peek(lex, 0);
+	if (0 == ch) {
+		lex->err.err = (q == '"')
+			? TOML2_UNCLOSED_TDQUOTE
+			: TOML2_UNCLOSED_TSQUOTE;
+		return 1;
+	}
+	else if ('\n' == ch) {
+		toml2_lex_advance(lex, true);
+		toml2_lex_eat_whitespace(lex);
+	}
+	else if ('\\' == ch && '\n' == toml2_lex_peek(lex, 1)) {
+		// XXX: The spec is a bit ambiguous; not sure if this requires triple
+		// double quotes or also works with triple singles. Just making it
+		// work with both now.
+		toml2_lex_advance(lex, false);
+		toml2_lex_advance(lex, true);
+		toml2_lex_eat_whitespace(lex);
+	}
+
+	// Then look for the triple end, noting that with """ \\n trims whitespace
+	// after the newline.
+	size_t pos = 0;
+	size_t quotes = 0;
+	UChar *wpos = lex->buf;
+
+	for (;; pos += 1) {
+		ch = toml2_lex_peek(lex, pos);
+		if (0 == ch) {
+			lex->err.err = (q == '"')
+				? TOML2_UNCLOSED_TDQUOTE
+				: TOML2_UNCLOSED_TSQUOTE;
+			return 1;
+		}
+
+		if (ch == '\n') {
+			lex->line += 1;
+			lex->col = 1;
+		} else {
+			lex->col += 1;
+		}
+
+		// With """, \\n trims whitespace until the next char isn't whitespace.
+		if ('\\' == ch && '"' == q && '\n' == toml2_lex_peek(lex, pos + 1)) {
+			pos += 2;
+			lex->line += 1;
+			lex->col = 1;
+
+			while (toml2_is_whitespace(toml2_lex_peek(lex, pos + 1))) {
+				lex->col += 1;
+				pos += 1;
+			}
+
+			continue;
+		}
+
+		if (q == ch) {
+			quotes += 1;
+		} else {
+			quotes = 0;
+		}
+
+		if (quotes == 3) {
+			// The previous two quotes don't count, back up.
+			wpos -= 2;
+			pos -= 2;
+			break;
+		}
+
+		*wpos++ = ch;
+	}
+
+	// For the emission, ignore the trailing '''/""".
+	size_t new_len = wpos - lex->buf;
+
+	// Then """ needs to be demangled.
+	if ('"' == q) {
+		if (0 != toml2_lex_demangle(lex, &new_len)) {
+			return 1;
+		}
+	}
+
+	toml2_lex_emit(lex, tok, new_len, TOML2_TOKEN_STRING);
+	lex->buf += pos + 3;
+	lex->buf_left -= pos + 3;
+	return 0;
 }
 
 static int
 toml2_lex_quote_any(toml2_lex_t *lex, toml2_token_t *tok, uint32_t flags)
 {
-	const char q = flags == TOML2_QUOTE_SINGLE ? '\'' : '"';
+	const char q = (flags & TOML2_QUOTE_SINGLE) ? '\'' : '"';
 
 	// If the next char is a quote, it's either an empty string or
 	// a triple quote.

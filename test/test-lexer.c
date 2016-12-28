@@ -209,6 +209,122 @@ START_TEST(dquote_comment)
 }
 END_TEST
 
+START_TEST(tdquote)
+{
+	toml2_lex_t lexer = check_init("\"\"\"hello\"\"\"");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
+	ck_assert_str_eq("hello", toml2_token_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(tdquote_nl)
+{
+	toml2_lex_t lexer = check_init("\"\"\"\nhello\"\"\"");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
+	ck_assert_str_eq("hello", toml2_token_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(tdquote_bsnl)
+{
+	toml2_lex_t lexer = check_init("\"\"\"\\\nhello\"\"\"");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
+	ck_assert_str_eq("hello", toml2_token_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(tdquote_nlnl)
+{
+	toml2_lex_t lexer = check_init("\"\"\"\n \thello\\\n \tworld\"\"\"");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
+	ck_assert_str_eq("helloworld", toml2_token_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(tdquote_bs)
+{
+	toml2_lex_t lexer = check_init("\"\"\"\\\"\\n\\t\"\"\"");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
+	ck_assert_str_eq("\"\n\t", toml2_token_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_tdquote_eof)
+{
+	toml2_lex_t lexer = check_init("\"\"\"foo\"\"");
+	check_token_err(&lexer, TOML2_UNCLOSED_TDQUOTE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(tsquote)
+{
+	toml2_lex_t lexer = check_init("'''hello'''");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
+	ck_assert_str_eq("hello", toml2_token_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(tsquote_nl)
+{
+	toml2_lex_t lexer = check_init("'''\nhello'''");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
+	ck_assert_str_eq("hello", toml2_token_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(tsquote_bsnl)
+{
+	toml2_lex_t lexer = check_init("'''\\\nhello'''");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
+	ck_assert_str_eq("hello", toml2_token_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(tsquote_nlnl)
+{
+	toml2_lex_t lexer = check_init("'''\nhello \n world'''");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
+	ck_assert_str_eq("hello \n world", toml2_token_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(tsquote_bs)
+{
+	toml2_lex_t lexer = check_init("'''\\n\\t'''");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
+	ck_assert_str_eq("\\n\\t", toml2_token_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_tsquote_eof)
+{
+	toml2_lex_t lexer = check_init("'''foo''");
+	check_token_err(&lexer, TOML2_UNCLOSED_TSQUOTE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
 Suite*
 suite_lexer()
 {
@@ -231,6 +347,18 @@ suite_lexer()
 		{ "err_dquote_u_bad", &err_dquote_u_bad },
 		{ "err_dquote_u_eof", &err_dquote_u_eof },
 		{ "dquote_comment",   &dquote_comment   },
+		{ "tdquote",          &tdquote          },
+		{ "tdquote_nl",       &tdquote_nl       },
+		{ "tdquote_bsnl",     &tdquote_bsnl     },
+		{ "tdquote_nlnl",     &tdquote_nlnl     },
+		{ "tdquote_bs",       &tdquote_bs       },
+		{ "err_tdquote_eof",  &err_tdquote_eof  },
+		{ "tsquote",          &tsquote          },
+		{ "tsquote_nl",       &tsquote_nl       },
+		{ "tsquote_bsnl",     &tsquote_bsnl     },
+		{ "tsquote_nlnl",     &tsquote_nlnl     },
+		{ "tsquote_bs",       &tsquote_bs       },
+		{ "err_tsquote_eof",  &err_tsquote_eof  },
 	};
 
 	return tcase_build_suite("lexer", tests, sizeof(tests));
