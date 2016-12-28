@@ -60,6 +60,7 @@ toml2_token_type_t;
 
 typedef struct {
 	toml2_token_type_t type;
+	size_t line, col;
 	size_t start, end;
 }
 toml2_token_t;
@@ -77,3 +78,8 @@ void toml2_lex_free(toml2_lex_t *lex);
 // toml2_lex_token parses the next token from lex into tok. A non-zero return
 // value indicates that there was a lex error.
 int toml2_lex_token(toml2_lex_t *lex, toml2_token_t *tok);
+
+// toml2_token_utf8 returns a heap-allocated string containing the UTF8
+// representation of the underlying data. NULL always indicates errors, which
+// get set on the lexer. The caller must free the underlying string.
+const char* toml2_token_utf8(toml2_lex_t *lex, toml2_token_t *tok);
