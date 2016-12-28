@@ -79,7 +79,7 @@ START_TEST(squote)
 {
 	toml2_lex_t lexer = check_init("'hello'");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	ck_assert_str_eq("hello", toml2_token_utf8(&lexer, &tok));
+	ck_assert_str_eq("hello", toml2_token_dbg_utf8(&lexer, &tok));
 	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
@@ -89,7 +89,7 @@ START_TEST(squote_bs)
 {
 	toml2_lex_t lexer = check_init("'h\\ello'");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	ck_assert_str_eq("h\\ello", toml2_token_utf8(&lexer, &tok));
+	ck_assert_str_eq("h\\ello", toml2_token_dbg_utf8(&lexer, &tok));
 	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
@@ -99,7 +99,7 @@ START_TEST(squote_bs2)
 {
 	toml2_lex_t lexer = check_init("'hello\\'");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	ck_assert_str_eq("hello\\", toml2_token_utf8(&lexer, &tok));
+	ck_assert_str_eq("hello\\", toml2_token_dbg_utf8(&lexer, &tok));
 	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
@@ -125,7 +125,7 @@ START_TEST(dquote)
 {
 	toml2_lex_t lexer = check_init("\"hello\"");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	ck_assert_str_eq("hello", toml2_token_utf8(&lexer, &tok));
+	ck_assert_str_eq("hello", toml2_token_dbg_utf8(&lexer, &tok));
 	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
@@ -135,7 +135,7 @@ START_TEST(dquote_bs)
 {
 	toml2_lex_t lexer = check_init("\" \\t \\b \\n \\r \\\\ \\\" \"");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	const char *utf8 = toml2_token_utf8(&lexer, &tok);
+	const char *utf8 = toml2_token_dbg_utf8(&lexer, &tok);
 	const char *expected = " \t \b \n \r \\ \" ";
 	ck_assert_int_eq(strlen(expected), strlen(utf8));
 	ck_assert_str_eq(expected, utf8);
@@ -156,7 +156,7 @@ START_TEST(dquote_u)
 {
 	toml2_lex_t lexer = check_init("\"x\\u000Ax\\u000ax\"");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	ck_assert_str_eq("x\nx\nx", toml2_token_utf8(&lexer, &tok));
+	ck_assert_str_eq("x\nx\nx", toml2_token_dbg_utf8(&lexer, &tok));
 	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
@@ -166,7 +166,7 @@ START_TEST(dquote_octopus)
 {
 	toml2_lex_t lexer = check_init("\"\\U0001F419\"");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	const char *utf8 = toml2_token_utf8(&lexer, &tok);
+	const char *utf8 = toml2_token_dbg_utf8(&lexer, &tok);
 	const char *expected = "\xF0\x9F\x90\x99";
 	ck_assert_int_eq(strlen(expected), strlen(utf8));
 	ck_assert_str_eq(expected, utf8);
@@ -203,7 +203,7 @@ START_TEST(dquote_comment)
 {
 	toml2_lex_t lexer = check_init("\"###\"");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	ck_assert_str_eq("###", toml2_token_utf8(&lexer, &tok));
+	ck_assert_str_eq("###", toml2_token_dbg_utf8(&lexer, &tok));
 	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
@@ -213,7 +213,7 @@ START_TEST(tdquote)
 {
 	toml2_lex_t lexer = check_init("\"\"\"hello\"\"\"");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	ck_assert_str_eq("hello", toml2_token_utf8(&lexer, &tok));
+	ck_assert_str_eq("hello", toml2_token_dbg_utf8(&lexer, &tok));
 	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
@@ -223,7 +223,7 @@ START_TEST(tdquote_nl)
 {
 	toml2_lex_t lexer = check_init("\"\"\"\nhello\"\"\"");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	ck_assert_str_eq("hello", toml2_token_utf8(&lexer, &tok));
+	ck_assert_str_eq("hello", toml2_token_dbg_utf8(&lexer, &tok));
 	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
@@ -233,7 +233,7 @@ START_TEST(tdquote_bsnl)
 {
 	toml2_lex_t lexer = check_init("\"\"\"\\\nhello\"\"\"");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	ck_assert_str_eq("hello", toml2_token_utf8(&lexer, &tok));
+	ck_assert_str_eq("hello", toml2_token_dbg_utf8(&lexer, &tok));
 	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
@@ -243,7 +243,7 @@ START_TEST(tdquote_nlnl)
 {
 	toml2_lex_t lexer = check_init("\"\"\"\n \thello\\\n \tworld\"\"\"");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	ck_assert_str_eq("helloworld", toml2_token_utf8(&lexer, &tok));
+	ck_assert_str_eq("helloworld", toml2_token_dbg_utf8(&lexer, &tok));
 	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
@@ -253,7 +253,7 @@ START_TEST(tdquote_bs)
 {
 	toml2_lex_t lexer = check_init("\"\"\"\\\"\\n\\t\"\"\"");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	ck_assert_str_eq("\"\n\t", toml2_token_utf8(&lexer, &tok));
+	ck_assert_str_eq("\"\n\t", toml2_token_dbg_utf8(&lexer, &tok));
 	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
@@ -271,7 +271,7 @@ START_TEST(tsquote)
 {
 	toml2_lex_t lexer = check_init("'''hello'''");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	ck_assert_str_eq("hello", toml2_token_utf8(&lexer, &tok));
+	ck_assert_str_eq("hello", toml2_token_dbg_utf8(&lexer, &tok));
 	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
@@ -281,7 +281,7 @@ START_TEST(tsquote_nl)
 {
 	toml2_lex_t lexer = check_init("'''\nhello'''");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	ck_assert_str_eq("hello", toml2_token_utf8(&lexer, &tok));
+	ck_assert_str_eq("hello", toml2_token_dbg_utf8(&lexer, &tok));
 	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
@@ -291,7 +291,7 @@ START_TEST(tsquote_bsnl)
 {
 	toml2_lex_t lexer = check_init("'''\\\nhello'''");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	ck_assert_str_eq("hello", toml2_token_utf8(&lexer, &tok));
+	ck_assert_str_eq("hello", toml2_token_dbg_utf8(&lexer, &tok));
 	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
@@ -301,7 +301,7 @@ START_TEST(tsquote_nlnl)
 {
 	toml2_lex_t lexer = check_init("'''\nhello \n world'''");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	ck_assert_str_eq("hello \n world", toml2_token_utf8(&lexer, &tok));
+	ck_assert_str_eq("hello \n world", toml2_token_dbg_utf8(&lexer, &tok));
 	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
@@ -311,7 +311,7 @@ START_TEST(tsquote_bs)
 {
 	toml2_lex_t lexer = check_init("'''\\n\\t'''");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	ck_assert_str_eq("\\n\\t", toml2_token_utf8(&lexer, &tok));
+	ck_assert_str_eq("\\n\\t", toml2_token_dbg_utf8(&lexer, &tok));
 	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
@@ -321,6 +321,73 @@ START_TEST(err_tsquote_eof)
 {
 	toml2_lex_t lexer = check_init("'''foo''");
 	check_token_err(&lexer, TOML2_UNCLOSED_TSQUOTE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(ival)
+{
+	toml2_lex_t lexer = check_init("42");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_INT);
+	ck_assert_int_eq(42, tok.ival);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(ival_plus)
+{
+	toml2_lex_t lexer = check_init("+42");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_INT);
+	ck_assert_int_eq(42, tok.ival);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(ival_neg)
+{
+	toml2_lex_t lexer = check_init("-42");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_INT);
+	ck_assert_int_eq(-42, tok.ival);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(ival_us)
+{
+	toml2_lex_t lexer = check_init("4_2");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_INT);
+	ck_assert_int_eq(42, tok.ival);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(ival_space_nl)
+{
+	toml2_lex_t lexer = check_init("42 \n");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_INT);
+	ck_assert_int_eq(42, tok.ival);
+	check_token(&lexer, TOML2_TOKEN_NEWLINE);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_ival_us)
+{
+	toml2_lex_t lexer = check_init("4__2");
+	check_token_err(&lexer, TOML2_INVALID_UNDERSCORE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_ival_last_us)
+{
+	toml2_lex_t lexer = check_init("42_");
+	check_token_err(&lexer, TOML2_INVALID_UNDERSCORE);
 	toml2_lex_free(&lexer);
 }
 END_TEST
@@ -359,6 +426,13 @@ suite_lexer()
 		{ "tsquote_nlnl",     &tsquote_nlnl     },
 		{ "tsquote_bs",       &tsquote_bs       },
 		{ "err_tsquote_eof",  &err_tsquote_eof  },
+		{ "ival",             &ival             },
+		{ "ival_plus",        &ival_plus        },
+		{ "ival_neg",         &ival_neg         },
+		{ "ival_us",          &ival_us          },
+		{ "ival_space_nl",    &ival_space_nl    },
+		{ "err_ival_us",      &err_ival_us      },
+		{ "err_ival_last_us", &err_ival_last_us },
 	};
 
 	return tcase_build_suite("lexer", tests, sizeof(tests));

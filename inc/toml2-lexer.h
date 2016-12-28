@@ -42,14 +42,17 @@ typedef struct {
 toml2_lex_t;
 
 typedef enum {
+	TOML2_TOKEN_INVALID = 0,
 	TOML2_TOKEN_COMMENT = 1,
 	TOML2_TOKEN_STRING,
 	TOML2_TOKEN_IDENTIFER,
-	TOML2_TOKEN_EQUALS,
 	TOML2_TOKEN_INT,
 	TOML2_TOKEN_DOUBLE,
 	TOML2_TOKEN_DATE,
 	TOML2_TOKEN_NEWLINE,
+	TOML2_TOKEN_EQUALS,
+	TOML2_TOKEN_COMMA,
+	TOML2_TOKEN_DOT,
 	TOML2_TOKEN_BRACE_OPEN,
 	TOML2_TOKEN_BRACE_CLOSE,
 	TOML2_TOKEN_BRACKET_OPEN,
@@ -62,6 +65,11 @@ typedef struct {
 	toml2_token_type_t type;
 	size_t line, col;
 	size_t start, end;
+
+	union {
+		int64_t ival;
+		double fval;
+	};
 }
 toml2_token_t;
 
@@ -79,7 +87,8 @@ void toml2_lex_free(toml2_lex_t *lex);
 // value indicates that there was a lex error.
 int toml2_lex_token(toml2_lex_t *lex, toml2_token_t *tok);
 
-// toml2_token_utf8 returns a heap-allocated string containing the UTF8
-// representation of the underlying data. NULL always indicates errors, which
-// get set on the lexer. The caller must free the underlying string.
-const char* toml2_token_utf8(toml2_lex_t *lex, toml2_token_t *tok);
+// toml2_token_dbg_utf8 returns a staticly-allocated string containing the UTF8
+// representation of the underlying data. NULL indicates errors (e.g. 
+// unencodable data). As this uses a static allocation, the returned string
+// is only valid until the next call.
+const char* toml2_token_dbg_utf8(toml2_lex_t *lex, toml2_token_t *tok);

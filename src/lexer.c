@@ -497,9 +497,120 @@ toml2_lex_quote_any(toml2_lex_t *lex, toml2_token_t *tok, uint32_t flags)
 }
 
 static int
-toml2_lex_value(toml2_lex_t *lex, toml2_token_t *tok)
+toml2_lex_int(toml2_lex_t *lex, toml2_token_t *tok, size_t len)
+{
+	uint64_t val = 0;
+	int64_t sign = 1;
+	bool prev_number = false;
+
+	for (size_t pos = 0; pos < len; pos += 1) {
+		UChar ch = toml2_lex_peek(lex, pos);
+
+		if (pos == 0) {
+			if ('-' == ch) {
+				sign = -1;
+				continue;
+
+			} else if ('+' == ch) {
+				// pass
+				continue;
+			}
+		}
+
+		if ('_' == ch) {
+			if (!prev_number) {
+				lex->err.err = TOML2_INVALID_UNDERSCORE;
+				return 1;
+			}
+
+			prev_number = false;
+			continue;
+		}
+
+		if ('0' > ch || '9' < ch) {
+			lex->err.err = TOML2_INVALID_INT;
+			return 1;
+		}
+
+		prev_number = true;
+		val *= 10;
+		val += ch - '0';
+	}
+
+	if (!prev_number) {
+		lex->err.err = TOML2_INVALID_UNDERSCORE;
+		return 1;
+	}
+
+	toml2_lex_emit(lex, tok, len, TOML2_TOKEN_INT);
+	tok->ival = ((int64_t) val) * sign;
+	toml2_lex_advance_n(lex, len);
+
+	return 0;
+}
+
+static int
+toml2_lex_double(toml2_lex_t *lex, toml2_token_t *tok, size_t len)
 {
 	return 1; // TODO
+}
+
+static int
+toml2_lex_date(toml2_lex_t *lex, toml2_token_t *tok, size_t len)
+{
+	return 1; // TODO
+}
+
+static int
+toml2_lex_value(toml2_lex_t *lex, toml2_token_t *tok)
+{
+	// Scan the value to see what type and length it is.
+	size_t pos = 0;
+	toml2_token_type_t type = TOML2_TOKEN_INT;
+
+	for (;; pos += 1) {
+		UChar ch = toml2_lex_peek(lex, pos);
+
+		if ('-' == ch || 'T' == ch) {
+			if (pos != 0) {
+				type = TOML2_TOKEN_DATE;
+			}
+		}
+		else if ('e' == ch || 'E' == ch || '.' == ch) {
+			// A '.' can appear in both dates and doubles -- the dates will
+			// always have it appear after '-', so give it higher points.
+			if (type == TOML2_TOKEN_DATE) {
+				type = TOML2_TOKEN_DOUBLE;
+			}
+		}
+		else if ('0' <= ch && '9' >= ch) {
+			// pass.
+		}
+		else if ('+' == ch || '_' == ch) {
+			// pass.
+		}
+		else {
+			// No more characters left to parse.
+			break;
+		}
+	}
+
+	if (0 == pos) {
+		// This should be impossible.
+		lex->err.err = TOML2_ERR_INTERNAL;
+		return 1;
+	}
+
+	switch (type) {
+		case TOML2_TOKEN_INT: return toml2_lex_int(lex, tok, pos);
+		case TOML2_TOKEN_DOUBLE: return toml2_lex_double(lex, tok, pos);
+		case TOML2_TOKEN_DATE: return toml2_lex_date(lex, tok, pos);
+		default: break;
+	}
+
+	// Should also be unreachable.
+	lex->err.err = TOML2_ERR_INTERNAL;
+	return 1;
 }
 
 static int
@@ -533,6 +644,8 @@ toml2_lex_token(toml2_lex_t *lex, toml2_token_t *tok)
 		{ '{',  TOML2_TOKEN_BRACE_OPEN,    false },
 		{ '}',  TOML2_TOKEN_BRACE_CLOSE,   false },
 		{ '=',  TOML2_TOKEN_EQUALS,        false },
+		{ ',',  TOML2_TOKEN_COMMA,         false },
+		{ '.',  TOML2_TOKEN_DOT,           false },
 	};
 	for (size_t i = 0; i < sizeof(singles) / sizeof(singles[0]); i += 1) {
 		if (singles[i].val == p) {
@@ -576,30 +689,20 @@ toml2_lex_token(toml2_lex_t *lex, toml2_token_t *tok)
 }
 
 const char*
-toml2_token_utf8(toml2_lex_t *lex, toml2_token_t *tok)
+toml2_token_dbg_utf8(toml2_lex_t *lex, toml2_token_t *tok)
 {
-	int32_t dstlen = 0;
+	static char buf[256];
+
 	int32_t srclen = tok->end - tok->start;
 	if (0 == srclen) {
-		return strdup("");
+		return "";
 	}
 
 	UErrorCode uerr = 0;
-	u_strToUTF8(NULL, 0, &dstlen, lex->buf_start + tok->start, srclen, &uerr);
-	// See note on toml2_lex_init.
-	if (U_BUFFER_OVERFLOW_ERROR != uerr) {
-		if (0 != toml2_check_uerr(lex, uerr)) {
-			return NULL;
-		}
-	}
-
-	char *out = calloc(dstlen, sizeof(char));
-	uerr = 0;
-
-	u_strToUTF8(out, dstlen, NULL, lex->buf_start + tok->start, srclen, &uerr);
+	u_strToUTF8(buf, sizeof(buf), NULL, lex->buf_start + tok->start, srclen, &uerr);
 	if (0 != toml2_check_uerr(lex, uerr)) {
 		return NULL;
 	}
 
-	return out;
+	return buf;
 }
