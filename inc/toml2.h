@@ -4,7 +4,9 @@
 
 typedef struct toml2_t toml2_t;
 typedef struct toml2_iter_t toml2_iter_t;
+typedef struct toml2_err_t toml2_err_t;
 typedef enum toml2_type_t toml2_type_t;
+typedef enum toml2_errcode_t toml2_errcode_t;
 
 enum toml2_type_t {
 	TOML2_TABLE = 1,
@@ -14,6 +16,35 @@ enum toml2_type_t {
 	TOML2_STRING,
 	TOML2_DATE,
 	TOML2_BOOL,
+};
+
+enum toml2_errcode_t {
+	TOML2_ERR_NONE = 0,
+	TOML2_ERR_ERRNO,
+	TOML2_ERR_ICUUC,
+	TOML2_ERR_NO_TABLE_CLOSE,
+	TOML2_ERR_NO_ATABLE_CLOSE,
+	TOML2_ERR_NOT_ID_OR_ARRAY,
+};
+
+struct toml2_err_t {
+	// line, col contain the position within the buffer that the error was
+	// encountered.
+	size_t line, col;
+
+	// err contains a TOML2_ERR_* value; for errors that come from other
+	// sources (TOML2_ERR_ERRNO, TOML2_ERR_ICUUC), the actual error code is
+	// stored in code.
+	toml2_errcode_t err;
+
+	// code contains the actual error if err is TOML2_ERR_ERRNO or
+	// TOML2_ERR_ICUUC.
+	int code;
+};
+
+struct toml2_t {
+	// err contains the details of the last-encountered error.
+	toml2_err_t err;
 };
 
 // toml2_init initalizes an allocated toml2_t object. The toml2_t object may

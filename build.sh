@@ -9,6 +9,8 @@ fi
 
 LIBS="
 	-L/usr/local/lib
+	-licuuc
+	-lcxxrt
 "
 
 BUILD_FLAGS="
