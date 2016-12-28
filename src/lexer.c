@@ -173,6 +173,90 @@ toml2_lex_comment(toml2_lex_t *lex, toml2_token_t *tok, uint32_t flags)
 	return toml2_lex_emit(lex, tok, 0, TOML2_TOKEN_COMMENT);
 }
 
+static UChar
+toml2_lex_unescape_table(toml2_lex_t *lex, UChar ch)
+{
+	switch (ch) {
+		case 'b': return '\b';
+		case 't': return '\t';
+		case 'n': return '\n';
+		case 'f': return '\f';
+		case 'r': return '\r';
+		case '\\': return '\\';
+		case '"': return '"';
+		// u/U handled in toml2_lex_unescape.
+		default: return 0;
+	}
+}
+
+static int
+toml2_lex_unescape_code(toml2_lex_t *lex, size_t pos, size_t len, UChar **wpos)
+{
+	UChar32 v = 0;
+
+	for (size_t i = 0; i < len; i += 1) {
+		v <<= 4;
+
+		UChar ch = toml2_lex_peek(lex, pos + i);
+		if ('a' <= ch && 'f' >= ch) {
+			v += (ch - 'a') + 10;
+		}
+		else if ('A' <= ch && 'F' >= ch) {
+			v += (ch - 'A') + 10;
+		}
+		else if ('0' <= ch && '9' >= ch) {
+			v += ch - '0';
+		}
+		else {
+			return 1;
+		}
+	}
+
+	int32_t dstout = 2;
+	UErrorCode uerr = 0;
+
+	// This is cheating but I don't care.
+	u_strFromUTF32(*wpos, 2, &dstout, &v, 1, &uerr);
+	if (uerr && uerr != U_STRING_NOT_TERMINATED_WARNING) {
+		return 1;
+	}
+
+	*wpos += dstout;
+	return 0;
+}
+
+static int
+toml2_lex_unescape(toml2_lex_t *lex, size_t pos, size_t len, UChar **wpos) {
+	UChar ch = toml2_lex_peek(lex, pos);
+	UChar rep = toml2_lex_unescape_table(lex, ch);
+	if (0 != rep) {
+		**wpos = rep;
+		*wpos += 1;
+		return 1;
+	}
+
+	if ('u' != ch && 'U' != ch) {
+		return 0;
+	}
+
+	// So, our underlying buffer is UTF-16; the \u escape is a single
+	// UTF-16 scalar and \U is a UTF-32 scalar. I'm *pretty* sure that in the
+	// latter case we can just treat it as two separate UTF-16 code points.
+	// That might be totally wrong though :sadface:.
+
+	int ret;
+	size_t inlen = 'u' == ch ? 4 : 8;
+
+	if (inlen + 1 > len) {
+		return 0;
+	}
+	if (0 != (ret = toml2_lex_unescape_code(lex, pos + 1, inlen, wpos))) {
+		return 0;
+	}
+
+	return inlen + 1;
+}
+
 // toml2_lex_demangle does an in-place modification from pos:pos+*orig_len and 
 // replaces any escape codes and such with their corresponding byte strings.
 // The underlying position is unchanged, but the new length is written out
@@ -182,7 +266,38 @@ toml2_lex_demangle(
 	toml2_lex_t *lex,
 	size_t *orig_len
 ) {
-	return 1; // TODO
+	UChar *wpos = lex->buf;
+
+	for (size_t i = 0; i < *orig_len; i += 1) {
+		UChar ch = toml2_lex_peek(lex, i);
+		if (0 == ch) {
+			// This should be impossible.
+			lex->err.err = TOML2_ERR_INTERNAL;
+			return 1;
+		}
+
+		if ('\\' == ch) {
+			size_t off = toml2_lex_unescape(
+				lex,
+				i + 1,
+				*orig_len - i - 1,
+				&wpos
+			);
+			if (0 == off) {
+				lex->err.err = TOML2_INVALID_ESCAPE;
+				return 1;
+			}
+
+			i += off;
+			continue;
+		}
+
+		*wpos = ch;
+		wpos += 1;
+	}
+
+	*orig_len = wpos - lex->buf;
+	return 0;
 }
 
 static int
@@ -226,12 +341,14 @@ toml2_lex_quote(toml2_lex_t *lex, toml2_token_t *tok, uint32_t flags)
 			}
 			break;
 		}
+
+		escape = false;
 	};
 
 	if (q == '"') {
 		size_t new_len = len;
 
-		int ret = toml2_lex_demangle(lex, &len);
+		int ret = toml2_lex_demangle(lex, &new_len);
 		if (0 != ret) {
 			return ret;
 		}
