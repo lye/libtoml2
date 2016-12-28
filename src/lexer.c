@@ -881,7 +881,47 @@ toml2_lex_value(toml2_lex_t *lex, toml2_token_t *tok)
 static int
 toml2_lex_id(toml2_lex_t *lex, toml2_token_t *tok)
 {
-	return 1; // TODO
+	// An identifier is any non-empty string of characters that are not 
+	// control characters or whitespace.
+	//
+	// The spec is ambiguous as to which unicode classes are allowed to
+	// be in identifiers and strictly defines "whitespace" as a 
+	// whitelist, so this implementation just includes literally anything
+	// as a valid identifier.
+	const UChar reserved[] = {
+		'.', ',', '=', '[', ']', '{', '}'
+	};
+	
+	size_t pos = 0;
+
+	for (;; pos += 1) {
+		UChar ch = toml2_lex_peek(lex, pos);
+
+		if (0 == ch) {
+			break;
+		}
+		
+		if (toml2_is_whitespace(ch) || '\n' == ch) {
+			break;
+		}
+
+		for (size_t i = 0; i < sizeof(reserved) / sizeof(reserved[0]); i += 1) {
+			if (reserved[i] == ch) {
+				break;
+			}
+		}
+	}
+
+	if (0 == pos) {
+		// This *should* be unreachable since we should have chomped all 
+		// leading whitespace.
+		lex->err.err = TOML2_ERR_INTERNAL;
+		return 1;
+	}
+
+	toml2_lex_emit(lex, tok, pos, TOML2_TOKEN_IDENTIFIER);
+	toml2_lex_advance_n(lex, pos);
+	return 0;
 }
 
 int

@@ -661,6 +661,46 @@ START_TEST(err_date_short)
 }
 END_TEST
 
+START_TEST(id)
+{
+	toml2_lex_t lexer = check_init("id");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_IDENTIFIER);
+	ck_assert_str_eq("id", toml2_token_dbg_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(table_decl)
+{
+	toml2_lex_t lexer = check_init("[  foo \t .\"ba\\\"\"  ]\n");
+	check_token(&lexer, TOML2_TOKEN_BRACKET_OPEN);
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_IDENTIFIER);
+	ck_assert_str_eq("foo", toml2_token_dbg_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_DOT);
+	tok = check_token(&lexer, TOML2_TOKEN_STRING);
+	ck_assert_str_eq("ba\"", toml2_token_dbg_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_BRACKET_CLOSE);
+	check_token(&lexer, TOML2_TOKEN_NEWLINE);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(id_octopus)
+{
+	toml2_lex_t lexer = check_init("\xF0\x9F\x90\x99 = 'octopus'\n");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_IDENTIFIER);
+	ck_assert_str_eq("\xF0\x9F\x90\x99", toml2_token_dbg_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_EQUALS);
+	tok = check_token(&lexer, TOML2_TOKEN_STRING);
+	ck_assert_str_eq("octopus", toml2_token_dbg_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_NEWLINE);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
 Suite*
 suite_lexer()
 {
@@ -725,6 +765,9 @@ suite_lexer()
 		{ "date2",            &date2            },
 		{ "date_short",       &date_short       },
 		{ "err_date_short",   &err_date_short   },
+		{ "id",               &id               },
+		{ "table_decl",       &table_decl       },
+		{ "id_octopus",       &id_octopus       },
 	};
 
 	return tcase_build_suite("lexer", tests, sizeof(tests));
