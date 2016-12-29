@@ -55,15 +55,48 @@ START_TEST(comments)
 }
 END_TEST
 
+START_TEST(two_tables)
+{
+	toml2_t doc = check_init("[foo]\nfoo=2\n[bar]\nfoo=4");
+	ck_assert_int_eq(2, toml2_int(toml2_get_path(&doc, "foo.foo")));
+	ck_assert_int_eq(4, toml2_int(toml2_get_path(&doc, "bar.foo")));
+	toml2_free(&doc);
+}
+END_TEST
+
+START_TEST(table_ary)
+{
+	toml2_t doc = check_init("[[foo]]\nbar=10\n[[foo]]\nbar=20");
+	ck_assert_int_eq(2, toml2_len(toml2_get_path(&doc, "foo")));
+	ck_assert_int_eq(10, toml2_int(toml2_get(toml2_index(toml2_get(&doc, "foo"), 0), "bar")));
+	ck_assert_int_eq(20, toml2_int(toml2_get(toml2_index(toml2_get(&doc, "foo"), 1), "bar")));
+	toml2_free(&doc);
+}
+END_TEST
+
+START_TEST(table_with_ary)
+{
+	toml2_t doc = check_init("[foo]\nbar=10\n[[foo.baz]]\nbar=20\n[[foo.baz]]\nbar=30");
+	ck_assert_int_eq(10, toml2_int(toml2_get_path(&doc, "foo.bar")));
+	ck_assert_int_eq(2, toml2_len(toml2_get_path(&doc, "foo.baz")));
+	ck_assert_int_eq(20, toml2_int(toml2_get_path(&doc, "foo.baz.0.bar")));
+	ck_assert_int_eq(30, toml2_int(toml2_get_path(&doc, "foo.baz.1.bar")));
+	toml2_free(&doc);
+}
+END_TEST
+
 Suite*
 suite_grammar()
 {
 	tcase_t tests[] = {
-		{ "init_free",   &init_free   },
-		{ "basic_table", &basic_table },
-		{ "root_value",  &root_value  },
-		{ "newlines",    &newlines    },
-		{ "comments",    &comments    },
+		{ "init_free",      &init_free      },
+		{ "basic_table",    &basic_table    },
+		{ "root_value",     &root_value     },
+		{ "newlines",       &newlines       },
+		{ "comments",       &comments       },
+		{ "two_tables",     &two_tables     },
+		{ "table_ary",      &table_ary      },
+		{ "table_with_ary", &table_with_ary },
 	};
 
 	return tcase_build_suite("grammar", tests, sizeof(tests));

@@ -40,6 +40,7 @@ enum toml2_errcode_t {
 	TOML2_VALUE_REASSIGNED     = 14,
 	TOML2_PARSE_ERROR          = 15,
 	TOML2_MISPLACED_IDENTIFIER = 16,
+	TOML2_LIST_REASSIGNED      = 17,
 };
 
 struct toml2_err_t {
@@ -117,6 +118,10 @@ toml2_t* toml2_get(toml2_t *node, const char *key);
 // are type errors (e.g., non-tables along the path) NULL is returned. This
 // won't work with keys that have .'s in them -- for that, you'll need to
 // use toml2_get.
+// 
+// As an extra bonus, you can use numbers to indicate array offets, e.g.
+// toml2_get_path(node, "foo.1.bar") returns the field "bar" in the second
+// table of the "foo" array.
 toml2_t* toml2_get_path(toml2_t *node, const char *path);
 
 // toml2_float returns the underlying double value, or 0 if the value

@@ -174,7 +174,7 @@ toml2_g_adj_ctx(toml2_parse_t *p, toml2_token_t *t, toml2_parse_mode_t m)
 		return TOML2_TABLE_REASSIGNED;
 	}
 
-	const char *name = NULL;
+	char *name = NULL;
 	if (TOML2_TOKEN_IDENTIFIER == t->type || TOML2_TOKEN_STRING == t->type) {
 		name = toml2_token_utf8(p->lex, t);
 	}
@@ -184,7 +184,10 @@ toml2_g_adj_ctx(toml2_parse_t *p, toml2_token_t *t, toml2_parse_mode_t m)
 
 	toml2_t *sub = toml2_get(doc, name);
 	if (NULL == sub) {
-		sub = malloc(sizeof(toml2_t));
+		if (NULL == (sub = malloc(sizeof(toml2_t)))) {
+			free(name);
+			return TOML2_NO_MEMORY;
+		}
 		toml2_init(sub);
 		sub->name = name;
 		RB_INSERT(toml2_tree_t, &doc->tree, sub);
@@ -192,6 +195,37 @@ toml2_g_adj_ctx(toml2_parse_t *p, toml2_token_t *t, toml2_parse_mode_t m)
 	}
 
 	toml2_parse_set_top(p, sub);
+	return 0;
+}
+
+// toml2_g_adj_list sets the top of the context stack to a list, appends
+// a new value to the list, then adjusts the top of the stack to be the
+// new value.
+static int
+toml2_g_adj_list(toml2_parse_t *p, toml2_token_t *t, toml2_parse_mode_t m)
+{
+	toml2_t *doc = toml2_parse_top(p);
+	if (0 == doc->type) {
+		doc->type = TOML2_LIST;
+	}
+	else if (TOML2_LIST != doc->type) {
+		return TOML2_LIST_REASSIGNED;
+	}
+
+	if (doc->ary_len == doc->ary_cap) {
+		size_t new_cap = doc->ary_cap + 3;
+		void *new_data = realloc(doc->ary, new_cap * sizeof(toml2_t));
+		if (NULL == new_data) {
+			return TOML2_NO_MEMORY;
+		}
+		doc->ary_cap = new_cap;
+		doc->ary = new_data;
+	}
+
+	toml2_t *sub = &doc->ary[doc->ary_len];
+	toml2_init(sub);
+	toml2_parse_set_top(p, sub);
+	doc->ary_len += 1;
 	return 0;
 }
 
@@ -336,17 +370,17 @@ static const toml2_g_node_t toml2_g_tables[] = {
 		{0},
 	}},
 	{ ATABLE_ID, {
-		{ TOML2_TOKEN_IDENTIFIER,    TABLE_DOT_OR_END, &toml2_g_adj_ctx     },
-		{ TOML2_TOKEN_STRING,        TABLE_DOT_OR_END, &toml2_g_adj_ctx     },
+		{ TOML2_TOKEN_IDENTIFIER,    ATABLE_DOT_OR_END, &toml2_g_adj_ctx    },
+		{ TOML2_TOKEN_STRING,        ATABLE_DOT_OR_END, &toml2_g_adj_ctx    },
 		{0},
 	}},
 	{ ATABLE_DOT_OR_END, {
-		{ TOML2_TOKEN_DOT,           TABLE_ID,         NULL                 },
+		{ TOML2_TOKEN_DOT,           ATABLE_ID,        NULL                 },
 		{ TOML2_TOKEN_BRACKET_CLOSE, ATABLE_CLOSE,     NULL                 },
 		{0},
 	}},
 	{ ATABLE_CLOSE, {
-		{ TOML2_TOKEN_BRACKET_CLOSE, NEWLINE,          NULL                 },
+		{ TOML2_TOKEN_BRACKET_CLOSE, NEWLINE,          &toml2_g_adj_list    },
 		{0},
 	}},
 	{ VALUE_EQUALS, {
@@ -415,6 +449,7 @@ toml2_parse(toml2_t *root, const char *data, size_t datalen)
 			}
 		}
 			
+		// BREAK HERE
 		if (NULL == next) {
 			ret = TOML2_PARSE_ERROR;
 			goto cleanup;
@@ -488,13 +523,29 @@ toml2_get_path(toml2_t *this, const char *name)
 	char *dup = strdup(name);
 	char *work = dup;
 
-	while (this != NULL && TOML2_TABLE == this->type) {
+	while (this != NULL) {
 		char *tmp = strtok_r(work, ".", &work);
 		if (NULL == tmp) {
 			break;
 		}
 
-		this = toml2_get(this, tmp);
+		if (TOML2_TABLE == this->type) {
+			this = toml2_get(this, tmp);
+		}
+		else if (TOML2_LIST == this->type) {
+			char *end = NULL;
+			size_t off = strtol(tmp, &end, 10);
+
+			if (0 != *end) {
+				this = NULL;
+			}
+			else {
+				this = toml2_index(this, off);
+			}
+		}
+		else {
+			this = NULL;
+		}
 	}
 
 	free(dup);
