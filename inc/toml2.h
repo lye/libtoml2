@@ -67,7 +67,10 @@ struct toml2_t {
 			toml2_t *ary;
 		};
 
-		toml2_tree_t tree;
+		struct {
+			size_t tree_len;
+			toml2_tree_t tree;
+		};
 
 		const char *sval;
 		int64_t ival;
@@ -104,26 +107,47 @@ toml2_type_t toml2_type(toml2_t *node);
 // copy if longer lifetimes are desired.
 const char* toml2_name(toml2_t *node);
 
-// toml2_value_float returns the underlying double value, or 0 if the value
-// is not TOML2_FLOAT.
-double toml2_value_float(toml2_t *node);
+// toml2_get returns the toml2_t for the corresponding key of the passed node.
+// If there is no such node or the input node is not a table, NULL is returned.
+// If NULL is passed in, NULL is passed out.
+toml2_t* toml2_get(toml2_t *node, const char *key);
 
-// toml2_value_bool returns the underlying boolean value, or false if the
+// toml2_get_path takes a .-delimited string and returns the corresponding
+// subdocument. If there is no such subdocument, it returns NULL. If there
+// are type errors (e.g., non-tables along the path) NULL is returned. This
+// won't work with keys that have .'s in them -- for that, you'll need to
+// use toml2_get.
+toml2_t* toml2_get_path(toml2_t *node, const char *path);
+
+// toml2_float returns the underlying double value, or 0 if the value
+// is not TOML2_FLOAT or TOML2_INT. In the latter case, the value is cast.
+double toml2_float(toml2_t *node);
+
+// toml2_bool returns the underlying boolean value, or false if the
 // value is not TOML2_BOOL.
-bool toml2_value_bool(toml2_t *node);
+bool toml2_bool(toml2_t *node);
 
-// toml2_value_int returns the underlying int value, or 0 if the value is
-// not TOML2_INT.
-int64_t toml2_value_int(toml2_t *node);
+// toml2_int returns the underlying int value, or 0 if the value is
+// not TOML2_INT or TOML2_FLOAT. In the latter case, the value is cast.
+int64_t toml2_int(toml2_t *node);
 
-// toml2_value_string returns the underlying string value, or NULL if the 
+// toml2_string returns the underlying string value, or NULL if the 
 // node is not a TOML2_STRING. The string is UTF8-encoded, and has a lifetime
 // bound to the toml2_t -- callers desiring longer lifetimes must copy the
 // string.
-const char* toml2_value_string(toml2_t *node);
+const char* toml2_string(toml2_t *node);
 
-// XXX: toml2_value_date.
+// toml2_date returns the underlying date value as a C struct tm.
+// If the node is note a TOML2_DATE, a zero'd object is returned. The
+// tm_wday/tm_yday/tm_isdst/tm_zone fields are never filled out.
+struct tm toml2_date(toml2_t *node);
 
-// toml2_value_bool returns the underlying boolean value, or false if
-// the node is not TOML2_BOOL.
-bool toml2_value_bool(toml2_t *node);
+// toml2_len returns the number of subelements. Zero is returned if
+// the passed node is NULL, or neither a TOML2_TABLE nor a TOML2_LIST.
+size_t toml2_len(toml2_t *node);
+
+// toml2_index returns the N-th element within the passed TOML2_TABLE
+// or TOML2_LIST. If the passed node is NULL, or the index is out of bounds,
+// NULL is returned. NOTE: For tables this is incredibly inefficient; consider
+// using an iterator instead (the entire table is enumerated).
+toml2_t* toml2_index(toml2_t *node, size_t idx);
