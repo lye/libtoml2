@@ -94,3 +94,7 @@ int toml2_lex_token(toml2_lex_t *lex, toml2_token_t *tok);
 // unencodable data). As this uses a static allocation, the returned string
 // is only valid until the next call.
 const char* toml2_token_dbg_utf8(toml2_lex_t *lex, toml2_token_t *tok);
+
+// toml2_token_utf8 works the same way as toml2_token_utf8 but returns a
+// heap-allocated string which the caller must free.
+char* toml2_token_utf8(toml2_lex_t *lex, toml2_token_t *tok);

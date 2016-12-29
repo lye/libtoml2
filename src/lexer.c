@@ -24,7 +24,7 @@ toml2_check_uerr(toml2_lex_t *lex, UErrorCode uerr)
 		return 0;
 	}
 
-	lex->err.err = TOML2_ERR_ICUUC;
+	lex->err.err = TOML2_ICUUC_ERROR;
 	lex->err.code = uerr;
 	return 1;
 }
@@ -279,7 +279,7 @@ toml2_lex_demangle(
 		UChar ch = toml2_lex_peek(lex, i);
 		if (0 == ch) {
 			// This should be impossible.
-			lex->err.err = TOML2_ERR_INTERNAL;
+			lex->err.err = TOML2_INTERNAL_ERROR;
 			return 1;
 		}
 
@@ -862,7 +862,7 @@ toml2_lex_value(toml2_lex_t *lex, toml2_token_t *tok)
 
 	if (0 == pos) {
 		// This should be impossible.
-		lex->err.err = TOML2_ERR_INTERNAL;
+		lex->err.err = TOML2_INTERNAL_ERROR;
 		return 1;
 	}
 
@@ -874,7 +874,7 @@ toml2_lex_value(toml2_lex_t *lex, toml2_token_t *tok)
 	}
 
 	// Should also be unreachable.
-	lex->err.err = TOML2_ERR_INTERNAL;
+	lex->err.err = TOML2_INTERNAL_ERROR;
 	return 1;
 }
 
@@ -907,15 +907,16 @@ toml2_lex_id(toml2_lex_t *lex, toml2_token_t *tok)
 
 		for (size_t i = 0; i < sizeof(reserved) / sizeof(reserved[0]); i += 1) {
 			if (reserved[i] == ch) {
-				break;
+				goto found;
 			}
 		}
 	}
+	found:
 
 	if (0 == pos) {
 		// This *should* be unreachable since we should have chomped all 
 		// leading whitespace.
-		lex->err.err = TOML2_ERR_INTERNAL;
+		lex->err.err = TOML2_INTERNAL_ERROR;
 		return 1;
 	}
 
@@ -1006,6 +1007,37 @@ toml2_token_dbg_utf8(toml2_lex_t *lex, toml2_token_t *tok)
 	UErrorCode uerr = 0;
 	u_strToUTF8(buf, sizeof(buf), NULL, lex->buf_start + tok->start, srclen, &uerr);
 	if (0 != toml2_check_uerr(lex, uerr)) {
+		return NULL;
+	}
+
+	return buf;
+}
+
+char*
+toml2_token_utf8(toml2_lex_t *lex, toml2_token_t *tok)
+{
+	UErrorCode uerr = 0;
+	int32_t srclen = tok->end - tok->start;
+	int32_t dstlen = 0;
+	int ret;
+
+	if (0 == srclen) {
+		return strdup("");
+	}
+
+	u_strToUTF8(NULL, 0, &dstlen, lex->buf_start + tok->start, srclen, &uerr);
+	if (U_BUFFER_OVERFLOW_ERROR != uerr) {
+		if (0 != (ret = toml2_check_uerr(lex, uerr))) {
+			return NULL;
+		}
+	}
+
+	char *buf = malloc(dstlen);
+	uerr = 0;
+
+	u_strToUTF8(buf, dstlen, NULL, lex->buf_start + tok->start, srclen, &uerr);
+	if (0 != (ret = toml2_check_uerr(lex, uerr))) {
+		free(buf);
 		return NULL;
 	}
 

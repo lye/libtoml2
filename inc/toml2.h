@@ -1,12 +1,16 @@
 #pragma once
 #include <sys/types.h>
+#include <sys/tree.h>
 #include <stdbool.h>
+#include <time.h>
 
 typedef struct toml2_t toml2_t;
 typedef struct toml2_iter_t toml2_iter_t;
 typedef struct toml2_err_t toml2_err_t;
 typedef enum toml2_type_t toml2_type_t;
 typedef enum toml2_errcode_t toml2_errcode_t;
+
+typedef RB_HEAD(toml2_tree_t, toml2_t) toml2_tree_t;
 
 enum toml2_type_t {
 	TOML2_TABLE = 1,
@@ -19,19 +23,23 @@ enum toml2_type_t {
 };
 
 enum toml2_errcode_t {
-	TOML2_ERR_NONE = 0,
-	TOML2_ERR_ERRNO,
-	TOML2_ERR_ICUUC,
-	TOML2_ERR_INTERNAL,
-	TOML2_UNCLOSED_DQUOTE,
-	TOML2_UNCLOSED_SQUOTE,
-	TOML2_UNCLOSED_TDQUOTE,
-	TOML2_UNCLOSED_TSQUOTE,
-	TOML2_INVALID_ESCAPE,
-	TOML2_INVALID_INT,
-	TOML2_INVALID_DOUBLE,
-	TOML2_INVALID_DATE,
-	TOML2_INVALID_UNDERSCORE,
+	TOML2_NO_ERROR             = 0,
+	TOML2_ICUUC_ERROR          = 1,
+	TOML2_INTERNAL_ERROR       = 2,
+	TOML2_NO_MEMORY            = 3,
+	TOML2_UNCLOSED_DQUOTE      = 4,
+	TOML2_UNCLOSED_SQUOTE      = 5,
+	TOML2_UNCLOSED_TDQUOTE     = 6,
+	TOML2_UNCLOSED_TSQUOTE     = 7,
+	TOML2_INVALID_ESCAPE       = 8,
+	TOML2_INVALID_INT          = 9,
+	TOML2_INVALID_DOUBLE       = 10,
+	TOML2_INVALID_DATE         = 11,
+	TOML2_INVALID_UNDERSCORE   = 12,
+	TOML2_TABLE_REASSIGNED     = 13,
+	TOML2_VALUE_REASSIGNED     = 14,
+	TOML2_PARSE_ERROR          = 15,
+	TOML2_MISPLACED_IDENTIFIER = 16,
 };
 
 struct toml2_err_t {
@@ -40,18 +48,33 @@ struct toml2_err_t {
 	size_t line, col;
 
 	// err contains a TOML2_ERR_* value; for errors that come from other
-	// sources (TOML2_ERR_ERRNO, TOML2_ERR_ICUUC), the actual error code is
-	// stored in code.
+	// sources (TOML2_ICUUC_ERROR), the actual error code is stored in code.
 	toml2_errcode_t err;
 
 	// code contains the actual error if err is TOML2_ERR_ERRNO or
-	// TOML2_ERR_ICUUC.
+	// TOML2_ICUUC_ERROR.
 	int code;
 };
 
 struct toml2_t {
-	// err contains the details of the last-encountered error.
-	toml2_err_t err;
+	toml2_type_t type;
+	const char *name;
+	RB_ENTRY(toml2_t) link;
+
+	union {
+		struct {
+			size_t ary_len, ary_cap;
+			toml2_t *ary;
+		};
+
+		toml2_tree_t tree;
+
+		const char *sval;
+		int64_t ival;
+		double fval;
+		bool bval;
+		struct tm tval;
+	};
 };
 
 // toml2_init initalizes an allocated toml2_t object. The toml2_t object may
@@ -59,15 +82,15 @@ struct toml2_t {
 // additional heap allocations will be made during use).
 void toml2_init(toml2_t *doc);
 
+// toml2_free frees all resources referenced by doc. The doc must be
+// reinitialized by toml2_init before re-use.
+void toml2_free(toml2_t *doc);
+
 // toml2_parse attempts to parse datalen bytes of TOML-formatted data from
 // data onto the heap, referenced from doc. A non-zero return value indicates
 // an error. doc must be initialized with toml2_init before use, and cannot
 // be re-used for subsequent parses.
-int toml2_parse(toml2_t *doc, char *data, size_t datalen);
-
-// toml2_free frees all resources referenced by doc. The doc must be
-// reinitialized by toml2_init before re-use.
-void toml2_free(toml2_t *doc);
+int toml2_parse(toml2_t *doc, const char *data, size_t datalen);
 
 // toml2_type_name returns a human-readable string for the given type.
 const char* toml2_type_name(toml2_type_t type);

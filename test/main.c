@@ -3,10 +3,12 @@
 typedef Suite*(*suite_def)();
 
 extern Suite 
-	*suite_lexer();
+	*suite_lexer(),
+	*suite_grammar();
 
 static suite_def suites[] = {
 	&suite_lexer,
+	&suite_grammar,
 };
 
 int
