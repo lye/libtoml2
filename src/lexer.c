@@ -114,7 +114,7 @@ toml2_lex_advance_n(toml2_lex_t *lex, size_t count)
 static UChar
 toml2_lex_peek(toml2_lex_t *lex, size_t off)
 {
-	if (off > lex->buf_left) {
+	if (off >= lex->buf_left) {
 		return 0;
 	}
 
