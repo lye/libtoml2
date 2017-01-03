@@ -60,89 +60,8 @@ toml2_free(toml2_t *doc)
 // This is where a smart person would pull in a parser generator or something.
 // Alas I am not a smart person.
 
-typedef struct {
-	toml2_lex_t *lex;
-	toml2_t *root;
-	char *saved_name;
-	size_t stack_len;
-	size_t stack_cap;
-	toml2_t **stack;
-}
-toml2_parse_t;
-
-static void
-toml2_parse_init(toml2_parse_t *p, toml2_lex_t *lex, toml2_t *root)
-{
-	bzero(p, sizeof(toml2_parse_t));
-	p->lex = lex;
-	p->root = root;
-}
-
-static void
-toml2_parse_free(toml2_parse_t *p)
-{
-	free(p->stack);
-}
-
-static int
-toml2_parse_push(toml2_parse_t *p, toml2_t *ctx)
-{
-	if (p->stack_len == p->stack_cap) {
-		size_t new_cap = p->stack_cap == 0 ? 3 : p->stack_cap + 3;
-		void *new = realloc(p->stack, new_cap * sizeof(toml2_t*));
-		if (NULL == new) {
-			return TOML2_NO_MEMORY;
-		}
-
-		p->stack = new;
-		p->stack_cap = new_cap;
-	}
-
-	p->stack[p->stack_len] = ctx;
-	p->stack_len += 1;
-	return 0;
-}
-
-static int
-toml2_parse_pop(toml2_parse_t *p)
-{
-	if (p->stack_len == 0) {
-		return TOML2_INTERNAL_ERROR;
-	}
-
-	p->stack_len -= 1;
-	return 0;
-}
-
-static int
-toml2_parse_reset(toml2_parse_t *p, toml2_t *ctx)
-{
-	p->stack_len = 0;
-	return toml2_parse_push(p, ctx);
-}
-
-static toml2_t*
-toml2_parse_top(toml2_parse_t *p)
-{
-	if (p->stack_len == 0) {
-		return NULL;
-	}
-
-	return p->stack[p->stack_len - 1];
-}
-
-static int
-toml2_parse_set_top(toml2_parse_t *p, toml2_t *ctx)
-{
-	if (p->stack_len == 0) {
-		return TOML2_INTERNAL_ERROR;
-	}
-
-	p->stack[p->stack_len - 1] = ctx;
-	return 0;
-}
-
 typedef enum {
+	UNDEFINED,
 	START_LINE,
 	TABLE_OR_ATABLE,
 	TABLE_ID,
@@ -153,183 +72,402 @@ typedef enum {
 	NEWLINE,
 	VALUE_EQUALS,
 	VALUE,
+	IARRAY_VAL_OR_END,
+	IARRAY_COM_OR_END,
+	IARRAY_VAL,
+	ITABLE_ID_OR_END,
+	ITABLE_COLON,
+	ITABLE_VAL,
+	ITABLE_COM_OR_END,
 	DONE,
 }
 toml2_parse_mode_t;
 
-typedef int(*trans_t)(toml2_parse_t*, toml2_token_t*, toml2_parse_mode_t);
+typedef struct {
+	toml2_t *doc;
+	toml2_parse_mode_t prev_mode;
+}
+toml2_frame_t;
 
-// toml2_g_adj_ctx sets the top of the context stack to a sub-element,
-// allocating the sub-element if needed. This creates does not set the
-// new element type, but will return an error if the parent element is
-// not a TOML2_TABLE.
 static int
-toml2_g_adj_ctx(toml2_parse_t *p, toml2_token_t *t, toml2_parse_mode_t m)
-{
-	toml2_t *doc = toml2_parse_top(p);
-	if (0 == doc->type) {
-		doc->type = TOML2_TABLE;
+toml2_frame_new_slot(
+	toml2_frame_t *top,
+	toml2_frame_t *out,
+	toml2_lex_t *lex,
+	toml2_token_t *tok
+) {
+	if (0 == top->doc->type) {
+		top->doc->type = TOML2_TABLE;
 	}
-	else if (TOML2_TABLE != doc->type) {
-		return TOML2_TABLE_REASSIGNED;
+	if (TOML2_TABLE != top->doc->type) {
+		return TOML2_INTERNAL_ERROR;
 	}
-
-	char *name = NULL;
-	if (TOML2_TOKEN_IDENTIFIER == t->type || TOML2_TOKEN_STRING == t->type) {
-		name = toml2_token_utf8(p->lex, t);
-	}
-	else {
+	if (TOML2_TOKEN_STRING != tok->type && TOML2_TOKEN_IDENTIFIER != tok->type) {
 		return TOML2_INTERNAL_ERROR;
 	}
 
-	toml2_t *sub = toml2_get(doc, name);
-	if (NULL == sub) {
-		if (NULL == (sub = malloc(sizeof(toml2_t)))) {
+	char *name = toml2_token_utf8(lex, tok);
+	toml2_t *doc = toml2_get(top->doc, name);
+	if (NULL == doc) {
+		doc = malloc(sizeof(toml2_t));
+		if (NULL == doc) {
 			free(name);
 			return TOML2_NO_MEMORY;
 		}
-		toml2_init(sub);
-		sub->name = name;
-		RB_INSERT(toml2_tree_t, &doc->tree, sub);
-		doc->tree_len += 1;
+
+		toml2_init(doc);
+		doc->name = name;
 	}
 
-	toml2_parse_set_top(p, sub);
+	RB_INSERT(toml2_tree_t, &top->doc->tree, doc);
+	top->doc->tree_len += 1;
+
+	out->doc = doc;
+	out->prev_mode = 0;
 	return 0;
 }
 
-// toml2_g_adj_list sets the top of the context stack to a list, appends
-// a new value to the list, then adjusts the top of the stack to be the
-// new value.
 static int
-toml2_g_adj_list(toml2_parse_t *p, toml2_token_t *t, toml2_parse_mode_t m)
+toml2_frame_push_slot(toml2_frame_t *top, toml2_frame_t *out)
 {
-	toml2_t *doc = toml2_parse_top(p);
-	if (0 == doc->type) {
-		doc->type = TOML2_LIST;
-	}
-	else if (TOML2_LIST != doc->type) {
-		return TOML2_LIST_REASSIGNED;
-	}
-
-	if (doc->ary_len == doc->ary_cap) {
-		size_t new_cap = doc->ary_cap + 3;
-		void *new_data = realloc(doc->ary, new_cap * sizeof(toml2_t));
+	if (top->doc->ary_len == top->doc->ary_cap) {
+		size_t new_cap = top->doc->ary_cap + 3;
+		void *new_data = realloc(top->doc->ary, new_cap * sizeof(toml2_t));
 		if (NULL == new_data) {
 			return TOML2_NO_MEMORY;
 		}
-		doc->ary_cap = new_cap;
-		doc->ary = new_data;
+
+		top->doc->ary_cap = new_cap;
+		top->doc->ary = new_data;
 	}
 
-	toml2_t *sub = &doc->ary[doc->ary_len];
-	toml2_init(sub);
-	toml2_parse_set_top(p, sub);
-	doc->ary_len += 1;
+	out->doc = &top->doc->ary[top->doc->ary_len];
+	out->prev_mode = 0;
+	toml2_init(out->doc);
+
+	top->doc->ary_len += 1;
 	return 0;
 }
 
-// toml2_g_push_ctx pushes a new context onto the stack with the given 
-// identifier. The new context has no type set; the intent is that this is used
-// for inline arrays/objects which may be nested ad nauseum.
 static int
-toml2_g_push_ctx(toml2_parse_t *p, toml2_token_t *t, toml2_parse_mode_t m)
+toml2_frame_save(toml2_frame_t *top, toml2_lex_t *lex, toml2_token_t *tok)
 {
-	toml2_t *doc = toml2_parse_top(p);
-	if (0 == doc->type) {
-		doc->type = TOML2_TABLE;
+	if (TOML2_TOKEN_STRING == tok->type) {
+		top->doc->type = TOML2_STRING;
+		top->doc->sval = toml2_token_utf8(lex, tok);
 	}
-	else if (TOML2_TABLE != doc->type) {
-		return TOML2_TABLE_REASSIGNED;
-	}
+	else if (TOML2_TOKEN_IDENTIFIER == tok->type) {
+		char *val = toml2_token_utf8(lex, tok);
+		if (NULL == val) {
+			return TOML2_NO_MEMORY;
+		}
 
-	char *name = NULL;
-	if (TOML2_TOKEN_IDENTIFIER == t->type || TOML2_TOKEN_STRING == t->type) {
-		name = toml2_token_utf8(p->lex, t);
-	}
-	else {
-		return TOML2_INTERNAL_ERROR;
-	}
-
-	toml2_t *sub = toml2_get(doc, name);
-	if (NULL != sub) {
-		free(name);
-		return TOML2_VALUE_REASSIGNED;
-	}
-
-	sub = malloc(sizeof(toml2_t));
-	toml2_init(sub);
-	sub->name = name;
-	RB_INSERT(toml2_tree_t, &doc->tree, sub);
-	doc->tree_len += 1;
-	toml2_parse_push(p, sub);
-	return 0;
-}
-
-// toml2_g_pop_ctx pops a context off the top of the stack. It's useful
-// for closing inline tables/arrays.
-static int
-toml2_g_pop_ctx(toml2_parse_t *p, toml2_token_t *t, toml2_parse_mode_t m)
-{
-	return toml2_parse_pop(p);
-}
-
-// toml2_g_reset_ctx wipes the context stack and pushes the root onto it.
-// This is used when a new table is defined but realistically should just
-// be implemented in terms of push/pop.
-static int
-toml2_g_reset_ctx(toml2_parse_t *p, toml2_token_t *t, toml2_parse_mode_t m)
-{
-	return toml2_parse_reset(p, p->root);
-}
-
-// toml2_g_save pulls the saved_name field and associates it with the
-// context at the top of the stack. It must be paired with a corresponding
-// toml2_g_push_ctx; the pushed context is popped off.
-static int
-toml2_g_save(toml2_parse_t *p, toml2_token_t *t, toml2_parse_mode_t m)
-{
-	toml2_t *doc = toml2_parse_top(p);
-	if (0 != doc->type) {
-		return TOML2_VALUE_REASSIGNED;
-	}
-
-	if (TOML2_TOKEN_IDENTIFIER == t->type) {
-		// This is actually true/false.
-		char *buf = toml2_token_utf8(p->lex, t);
-		bool is_true = !strcmp(buf, "true");
-		bool is_false = !is_true && !strcmp(buf, "false");
-		free(buf);
+		bool is_true = !strcmp(val, "true");
+		bool is_false = !strcmp(val, "false");
+		free(val);
 
 		if (!is_true && !is_false) {
 			return TOML2_MISPLACED_IDENTIFIER;
 		}
 
-		doc->type = TOML2_BOOL;
-		doc->bval = is_true;
+		top->doc->type = TOML2_BOOL;
+		top->doc->bval = is_true;
 	}
-	else if (TOML2_TOKEN_STRING == t->type) {
-		doc->type = TOML2_STRING;
-		doc->sval = toml2_token_utf8(p->lex, t);
+	else if (TOML2_TOKEN_INT == tok->type) {
+		top->doc->type = TOML2_INT;
+		top->doc->ival = tok->ival;
 	}
-	else if (TOML2_TOKEN_INT == t->type) {
-		doc->type = TOML2_INT;
-		doc->ival = t->ival;
+	else if (TOML2_TOKEN_DOUBLE == tok->type) {
+		top->doc->type = TOML2_FLOAT;
+		top->doc->fval = tok->fval;
 	}
-	else if (TOML2_TOKEN_DOUBLE == t->type) {
-		doc->type = TOML2_FLOAT;
-		doc->fval = t->fval;
+	else if (TOML2_TOKEN_DATE == tok->type) {
+		top->doc->type = TOML2_DATE;
+		top->doc->tval = tok->time;
 	}
-	else if (TOML2_TOKEN_DATE == t->type) {
-		doc->type = TOML2_DATE;
-		doc->tval = t->time;
+	else {
+		return TOML2_PARSE_ERROR;
+	}
+
+	return 0;
+}
+
+typedef struct {
+	toml2_lex_t *lex;
+	size_t stack_len;
+	size_t stack_cap;
+	toml2_frame_t *stack;
+}
+toml2_parse_t;
+
+static void
+toml2_parse_init(toml2_parse_t *p, toml2_lex_t *lex)
+{
+	bzero(p, sizeof(toml2_parse_t));
+	p->lex = lex;
+}
+
+static void
+toml2_parse_free(toml2_parse_t *p)
+{
+	free(p->stack);
+}
+
+static toml2_frame_t*
+toml2_parse_top(toml2_parse_t *p)
+{
+	if (0 == p->stack_len) {
+		return NULL;
+	}
+
+	return &p->stack[p->stack_len - 1];
+}
+
+static int
+toml2_parse_push(toml2_parse_t *p, toml2_frame_t frame)
+{
+	if (p->stack_len == p->stack_cap) {
+		size_t new_cap = p->stack_cap + 3;
+		void *new_data = realloc(p->stack, new_cap * sizeof(toml2_frame_t));
+		if (NULL == new_data) {
+			return TOML2_NO_MEMORY;
+		}
+
+		p->stack_cap = new_cap;
+		p->stack = new_data;
+	}
+
+	p->stack[p->stack_len] = frame;
+	p->stack_len += 1;
+	return 0;
+}
+
+// toml2_g_subfield sets the top frame to it's subfield, specified by the
+// current token. The top frame must be a table or untyped; in the latter 
+// case it is typed as a table. If the subfield doesn't exist, it is created
+// as an untyped field.
+//
+// This is used when resolving table declarations.
+static int
+toml2_g_subfield(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
+{
+	toml2_frame_t *top = toml2_parse_top(p);
+	if (NULL == top) {
+		return TOML2_INTERNAL_ERROR;
+	}
+
+	if (0 == top->doc->type) {
+		top->doc->type = TOML2_TABLE;
+	}
+	else if (TOML2_TABLE != top->doc->type) {
+		return TOML2_TABLE_REASSIGNED;
+	}
+	if (TOML2_TOKEN_STRING != tok->type && TOML2_TOKEN_IDENTIFIER != tok->type) {
+		return TOML2_INTERNAL_ERROR;
+	}
+
+	toml2_frame_t new;
+	int ret = toml2_frame_new_slot(top, &new, p->lex, tok);
+	if (0 != ret) {
+		return ret;
+	}
+
+	*top = new;
+	return 0;
+}
+
+// toml2_g_subtable sets the top frame to a new entry in the list contained
+// in the top frame. Top frame must be a list or untyped.
+static int
+toml2_g_subtable(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
+{
+	toml2_frame_t *top = toml2_parse_top(p);
+	if (NULL == top) {
+		return TOML2_INTERNAL_ERROR;
+	}
+
+	if (0 == top->doc->type) {
+		top->doc->type = TOML2_LIST;
+	}
+	else if (TOML2_LIST != top->doc->type) {
+		return TOML2_LIST_REASSIGNED;
+	}
+
+	toml2_frame_t new;
+	int ret;
+   	if (0 != (ret = toml2_frame_push_slot(top, &new))) {
+		return ret;
+	}
+	new.doc->type = TOML2_TABLE;
+
+	*top = new;
+
+	return 0;
+}
+
+// toml2_g_reset pops off the top frame and pushes the first frame back on,
+// effectively reverting the top frame to the root node.
+static int
+toml2_g_reset(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
+{
+	if (2 != p->stack_len) {
+		return TOML2_INTERNAL_ERROR;
+	}
+
+	p->stack[1] = p->stack[0];
+	return 0;
+}
+
+// toml2_g_name pushes a new frame with the name set to the token value.
+// The top frame must be a table or untyped.
+static int
+toml2_g_name(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
+{
+	toml2_frame_t *top = toml2_parse_top(p);
+	if (NULL == top) {
+		return TOML2_INTERNAL_ERROR;
+	}
+	if (0 == top->doc->type) {
+		top->doc->type = TOML2_TABLE;
+	}
+	else if (TOML2_TABLE != top->doc->type) {
+		return TOML2_INTERNAL_ERROR;
+	}
+
+	toml2_frame_t new;
+	int ret;
+
+	if (0 != (ret = toml2_frame_new_slot(top, &new, p->lex, tok))) {
+		return ret;
+	}
+
+	if (0 != (ret = toml2_parse_push(p, new))) {
+		return ret;
+	}
+
+	return 0;
+}
+
+// toml2_g_save stores the token in the top frame, then pops it off the stack.
+static int
+toml2_g_save(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
+{
+	toml2_frame_t *top = toml2_parse_top(p);
+	if (NULL == top) {
+		return TOML2_INTERNAL_ERROR;
+	}
+	if (0 != top->doc->type) {
+		return TOML2_VALUE_REASSIGNED;
+	}
+
+	int ret;
+	if (0 != (ret = toml2_frame_save(top, p->lex, tok))) {
+		return ret;
+	}
+
+	p->stack_len -= 1;
+	return 0;
+}
+
+// toml2_g_append appends a value to the list in the top frame, then persists
+// the current token to it. The current frame is unchanged.
+static int
+toml2_g_append(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
+{
+	toml2_frame_t *top = toml2_parse_top(p);
+	if (NULL == top) {
+		return TOML2_INTERNAL_ERROR;
+	}
+	if (0 == top->doc->type) {
+		top->doc->type = TOML2_LIST;
+	}
+	else if (TOML2_LIST != top->doc->type) {
+		return TOML2_LIST_REASSIGNED;
+	}
+
+	toml2_frame_t new;
+	int ret;
+
+	if (0 != (ret = toml2_frame_push_slot(top, &new))) {
+		return ret;
+	}
+	if (0 != (ret = toml2_frame_save(&new, p->lex, tok))) {
+		return ret;
+	}
+
+	return 0;
+}
+
+// toml2_g_push pushes a new frame on the stack, saving the current parser
+// mode. The new frame is either an array or a table, depending on the token.
+// If the top of the stack is untyped (via toml2_g_name) it is consumed,
+// otherwise the stack is unaltered.
+static int
+toml2_g_push(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
+{
+	toml2_frame_t *top = toml2_parse_top(p);
+	if (NULL == top) {
+		return TOML2_INTERNAL_ERROR;
+	}
+
+	// This is a bit of a mess; if the top-level object is an array, we need
+	// to append an entry. Otherwise it should be untyped and we can use it
+	// directly -- replacing the frame.
+	toml2_frame_t new;
+	int ret;
+
+	if (TOML2_LIST == top->doc->type) {
+		if (0 != (ret = toml2_frame_push_slot(top, &new))) {
+			return ret;
+		}
+	}
+	else if (0 != top->doc->type) {
+		return TOML2_VALUE_REASSIGNED;
+	}
+	else {
+		new = *top;
+		if (1 == p->stack_len) {
+			return TOML2_INTERNAL_ERROR;
+		}
+		p->stack_len -= 1;
+	}
+
+	new.prev_mode = *m;
+	
+	// If the token is [, create a list; if { an object.
+	if (TOML2_TOKEN_BRACKET_OPEN == tok->type) {
+		new.doc->type = TOML2_LIST;
+	}
+	else if (TOML2_TOKEN_BRACE_OPEN == tok->type) {
+		new.doc->type = TOML2_TABLE;
 	}
 	else {
 		return TOML2_INTERNAL_ERROR;
 	}
 
-	return toml2_g_pop_ctx(p, t, m);
+	return toml2_parse_push(p, new);
 }
+
+// toml2_g_pop removes the top frame of the stack and reverts the parser mode
+// to what it was when the frame was pushed.
+static int
+toml2_g_pop(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
+{
+	if (2 <= p->stack_len) {
+		return TOML2_INTERNAL_ERROR;
+	}
+
+	toml2_frame_t *top = toml2_parse_top(p);
+	if (0 == top->prev_mode) {
+		return TOML2_INTERNAL_ERROR;
+	}
+
+	*m = top->prev_mode;
+	p->stack_len -= 1;
+	return 0;
+}
+
+typedef int(*trans_t)(toml2_parse_t*, toml2_token_t*, toml2_parse_mode_t*);
 
 typedef struct {
 	toml2_token_type_t tok;
@@ -340,28 +478,28 @@ toml2_g_trans_t;
 
 typedef struct {
 	toml2_parse_mode_t mode;
-	toml2_g_trans_t transitions[6];
+	toml2_g_trans_t transitions[9];
 }
 toml2_g_node_t;
 
 static const toml2_g_node_t toml2_g_tables[] = {
 	{ START_LINE, {
-		{ TOML2_TOKEN_BRACKET_OPEN,  TABLE_OR_ATABLE,  &toml2_g_reset_ctx   },
-		{ TOML2_TOKEN_IDENTIFIER,    VALUE_EQUALS,     &toml2_g_push_ctx    },
-		{ TOML2_TOKEN_STRING,        VALUE_EQUALS,     &toml2_g_push_ctx    },
+		{ TOML2_TOKEN_BRACKET_OPEN,  TABLE_OR_ATABLE,  &toml2_g_reset       },
+		{ TOML2_TOKEN_IDENTIFIER,    VALUE_EQUALS,     &toml2_g_name        },
+		{ TOML2_TOKEN_STRING,        VALUE_EQUALS,     &toml2_g_name        },
 		{ TOML2_TOKEN_EOF,           DONE,             NULL                 },
 		{ TOML2_TOKEN_NEWLINE,       START_LINE,       NULL                 },
 		{0},
 	}},
 	{ TABLE_OR_ATABLE, {
 		{ TOML2_TOKEN_BRACKET_OPEN,  ATABLE_ID,        NULL                 },
-		{ TOML2_TOKEN_IDENTIFIER,    TABLE_DOT_OR_END, &toml2_g_adj_ctx     },
-		{ TOML2_TOKEN_STRING,        TABLE_DOT_OR_END, &toml2_g_adj_ctx     },
+		{ TOML2_TOKEN_IDENTIFIER,    TABLE_DOT_OR_END, &toml2_g_subfield    },
+		{ TOML2_TOKEN_STRING,        TABLE_DOT_OR_END, &toml2_g_subfield    },
 		{0},
 	}},
 	{ TABLE_ID, {
-		{ TOML2_TOKEN_IDENTIFIER,    TABLE_DOT_OR_END, &toml2_g_adj_ctx     },
-		{ TOML2_TOKEN_STRING,        TABLE_DOT_OR_END, &toml2_g_adj_ctx     },
+		{ TOML2_TOKEN_IDENTIFIER,    TABLE_DOT_OR_END, &toml2_g_subfield    },
+		{ TOML2_TOKEN_STRING,        TABLE_DOT_OR_END, &toml2_g_subfield    },
 		{0},
 	}},
 	{ TABLE_DOT_OR_END, {
@@ -370,8 +508,8 @@ static const toml2_g_node_t toml2_g_tables[] = {
 		{0},
 	}},
 	{ ATABLE_ID, {
-		{ TOML2_TOKEN_IDENTIFIER,    ATABLE_DOT_OR_END, &toml2_g_adj_ctx    },
-		{ TOML2_TOKEN_STRING,        ATABLE_DOT_OR_END, &toml2_g_adj_ctx    },
+		{ TOML2_TOKEN_IDENTIFIER,    ATABLE_DOT_OR_END, &toml2_g_subfield   },
+		{ TOML2_TOKEN_STRING,        ATABLE_DOT_OR_END, &toml2_g_subfield   },
 		{0},
 	}},
 	{ ATABLE_DOT_OR_END, {
@@ -380,7 +518,7 @@ static const toml2_g_node_t toml2_g_tables[] = {
 		{0},
 	}},
 	{ ATABLE_CLOSE, {
-		{ TOML2_TOKEN_BRACKET_CLOSE, NEWLINE,          &toml2_g_adj_list    },
+		{ TOML2_TOKEN_BRACKET_CLOSE, NEWLINE,          &toml2_g_subtable    },
 		{0},
 	}},
 	{ VALUE_EQUALS, {
@@ -388,32 +526,91 @@ static const toml2_g_node_t toml2_g_tables[] = {
 		{0},
 	}},
 	{ VALUE, {
-		{ TOML2_TOKEN_IDENTIFIER,    NEWLINE,          &toml2_g_save        },
-		{ TOML2_TOKEN_STRING,        NEWLINE,          &toml2_g_save        },
-		{ TOML2_TOKEN_INT,           NEWLINE,          &toml2_g_save        },
-		{ TOML2_TOKEN_DOUBLE,        NEWLINE,          &toml2_g_save        },
+		{ TOML2_TOKEN_IDENTIFIER,    NEWLINE,           &toml2_g_save       },
+		{ TOML2_TOKEN_STRING,        NEWLINE,           &toml2_g_save       },
+		{ TOML2_TOKEN_INT,           NEWLINE,           &toml2_g_save       },
+		{ TOML2_TOKEN_DOUBLE,        NEWLINE,           &toml2_g_save       },
+		{ TOML2_TOKEN_BRACKET_OPEN,  IARRAY_VAL_OR_END, &toml2_g_push       },
+		{ TOML2_TOKEN_BRACE_OPEN,    ITABLE_ID_OR_END,  &toml2_g_push       },
 		{0},
+	}},
+	{ IARRAY_VAL_OR_END, {
+		{ TOML2_TOKEN_STRING,        IARRAY_COM_OR_END, &toml2_g_append     },
+		{ TOML2_TOKEN_INT,           IARRAY_COM_OR_END, &toml2_g_append     },
+		{ TOML2_TOKEN_DOUBLE,        IARRAY_COM_OR_END, &toml2_g_append     },
+		{ TOML2_TOKEN_IDENTIFIER,    IARRAY_COM_OR_END, &toml2_g_append     },
+		{ TOML2_TOKEN_DATE,          IARRAY_COM_OR_END, &toml2_g_append     },
+		{ TOML2_TOKEN_BRACKET_OPEN,  IARRAY_VAL_OR_END, &toml2_g_push       },
+		{ TOML2_TOKEN_BRACE_OPEN,    IARRAY_COM_OR_END, &toml2_g_push       },
+		{ TOML2_TOKEN_BRACKET_CLOSE, UNDEFINED,         &toml2_g_pop        },
+		{0},
+	}},
+	{ IARRAY_COM_OR_END, {
+		{ TOML2_TOKEN_COMMA,         IARRAY_VAL,        NULL                },
+		{0},
+	}},
+	{ IARRAY_VAL, {
+		{ TOML2_TOKEN_STRING,        IARRAY_COM_OR_END, &toml2_g_append     },
+		{ TOML2_TOKEN_INT,           IARRAY_COM_OR_END, &toml2_g_append     },
+		{ TOML2_TOKEN_DOUBLE,        IARRAY_COM_OR_END, &toml2_g_append     },
+		{ TOML2_TOKEN_IDENTIFIER,    IARRAY_COM_OR_END, &toml2_g_append     },
+		{ TOML2_TOKEN_DATE,          IARRAY_COM_OR_END, &toml2_g_append     },
+		{ TOML2_TOKEN_BRACKET_OPEN,  IARRAY_VAL_OR_END, &toml2_g_push       },
+		{ TOML2_TOKEN_BRACE_OPEN,    IARRAY_COM_OR_END, &toml2_g_push       },
+		{0},
+	}},
+	{ ITABLE_ID_OR_END, {
+		{ TOML2_TOKEN_STRING,        ITABLE_COLON,      &toml2_g_name       },
+		{ TOML2_TOKEN_BRACE_CLOSE,   UNDEFINED,         &toml2_g_pop        },
+		{0}
+	}},
+	{ ITABLE_COLON, {
+		{ TOML2_TOKEN_COLON,         ITABLE_VAL,        NULL                },
+		{0}
+	}},
+	{ ITABLE_VAL, {
+		{ TOML2_TOKEN_STRING,        ITABLE_COM_OR_END, &toml2_g_save       },
+		{ TOML2_TOKEN_INT,           ITABLE_COM_OR_END, &toml2_g_save       },
+		{ TOML2_TOKEN_DOUBLE,        ITABLE_COM_OR_END, &toml2_g_save       },
+		{ TOML2_TOKEN_IDENTIFIER,    ITABLE_COM_OR_END, &toml2_g_save       },
+		{ TOML2_TOKEN_DATE,          ITABLE_COM_OR_END, &toml2_g_save       },
+		{ TOML2_TOKEN_BRACKET_OPEN,  IARRAY_VAL_OR_END, &toml2_g_push       },
+		{ TOML2_TOKEN_BRACE_OPEN,    ITABLE_ID_OR_END,  &toml2_g_push       },
+		{0},
+	}},
+	{ ITABLE_ID_OR_END, {
+		{ TOML2_TOKEN_STRING,        ITABLE_COLON,      &toml2_g_name       },
+		{ TOML2_TOKEN_BRACE_CLOSE,   UNDEFINED,         &toml2_g_pop        },
 	}},
 	{ NEWLINE, {
 		{ TOML2_TOKEN_NEWLINE,       START_LINE,       NULL                 },
 		{ TOML2_TOKEN_EOF,           DONE,             NULL                 },
+		{0},
 	}}
 };
 
 int
 toml2_parse(toml2_t *root, const char *data, size_t datalen)
 {
+	int ret;
 	toml2_lex_t lexer;
 	toml2_parse_t parser;
 	toml2_token_t tok;
 	toml2_parse_mode_t mode = START_LINE;
+	toml2_frame_t root_frame = {
+		.doc = root,
+		.prev_mode = 0,
+	};
 
-	toml2_parse_init(&parser, &lexer, root);
-	int ret = toml2_lex_init(&lexer, data, datalen);
-	if (0 != ret) {
+	toml2_parse_init(&parser, &lexer);
+
+	if (0 != (ret = toml2_lex_init(&lexer, data, datalen))) {
 		goto cleanup;
 	}
-	if (0 != (ret = toml2_parse_push(&parser, root))) {
+	if (0 != (ret = toml2_parse_push(&parser, root_frame))) {
+		goto cleanup;
+	}
+	if (0 != (ret = toml2_parse_push(&parser, root_frame))) {
 		goto cleanup;
 	}
 
@@ -456,13 +653,15 @@ toml2_parse(toml2_t *root, const char *data, size_t datalen)
 		}
 
 		if (NULL != next->fn) {
-			ret = next->fn(&parser, &tok, mode);
+			ret = next->fn(&parser, &tok, &mode);
 			if (0 != ret) {
 				goto cleanup;
 			}
 		}
 
-		mode = next->next;
+		if (UNDEFINED != next) {
+			mode = next->next;
+		}
 	}
 	while (DONE != mode);
 

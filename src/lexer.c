@@ -889,7 +889,7 @@ toml2_lex_id(toml2_lex_t *lex, toml2_token_t *tok)
 	// whitelist, so this implementation just includes literally anything
 	// as a valid identifier.
 	const UChar reserved[] = {
-		'.', ',', '=', '[', ']', '{', '}'
+		'.', ',', '=', '[', ']', '{', '}', ':'
 	};
 	
 	size_t pos = 0;
@@ -952,6 +952,7 @@ toml2_lex_token(toml2_lex_t *lex, toml2_token_t *tok)
 		{ '=',  TOML2_TOKEN_EQUALS,        false },
 		{ ',',  TOML2_TOKEN_COMMA,         false },
 		{ '.',  TOML2_TOKEN_DOT,           false },
+		{ ':',  TOML2_TOKEN_COLON,         false },
 	};
 	for (size_t i = 0; i < sizeof(singles) / sizeof(singles[0]); i += 1) {
 		if (singles[i].val == p) {
