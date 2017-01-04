@@ -51,4 +51,12 @@ $CC \
 	./bin/libtoml2.a \
 	-o bin/libtoml2.test
 
+$CC \
+	$BUILD_FLAGS \
+	$LIBS \
+	$OBJ_FILES \
+	cmd/burntsushi.c \
+	./bin/libtoml2.a \
+	-o bin/burntsushi
+
 env MALLOC_OPTIONS=J ./bin/libtoml2.test
