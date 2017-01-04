@@ -76,6 +76,7 @@ typedef enum {
 	IARRAY_COM_OR_END,
 	IARRAY_VAL,
 	ITABLE_ID_OR_END,
+	ITABLE_ID,
 	ITABLE_COLON,
 	ITABLE_VAL,
 	ITABLE_COM_OR_END,
@@ -453,7 +454,7 @@ toml2_g_push(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 static int
 toml2_g_pop(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 {
-	if (2 <= p->stack_len) {
+	if (2 >= p->stack_len) {
 		return TOML2_INTERNAL_ERROR;
 	}
 
@@ -462,7 +463,23 @@ toml2_g_pop(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 		return TOML2_INTERNAL_ERROR;
 	}
 
-	*m = top->prev_mode;
+	// Figure out the next parse mode based on where we stopped parsing.
+	if (VALUE == top->prev_mode) {
+		*m = NEWLINE;
+	}
+	else if (
+		IARRAY_VAL == top->prev_mode
+		|| IARRAY_VAL_OR_END == top->prev_mode
+	) {
+		*m = IARRAY_COM_OR_END;
+	}
+	else if (ITABLE_VAL == top->prev_mode) {
+		*m = ITABLE_COM_OR_END;
+	}
+	else {
+		return TOML2_INTERNAL_ERROR;
+	}
+
 	p->stack_len -= 1;
 	return 0;
 }
@@ -541,12 +558,13 @@ static const toml2_g_node_t toml2_g_tables[] = {
 		{ TOML2_TOKEN_IDENTIFIER,    IARRAY_COM_OR_END, &toml2_g_append     },
 		{ TOML2_TOKEN_DATE,          IARRAY_COM_OR_END, &toml2_g_append     },
 		{ TOML2_TOKEN_BRACKET_OPEN,  IARRAY_VAL_OR_END, &toml2_g_push       },
-		{ TOML2_TOKEN_BRACE_OPEN,    IARRAY_COM_OR_END, &toml2_g_push       },
+		{ TOML2_TOKEN_BRACE_OPEN,    ITABLE_ID_OR_END,  &toml2_g_push       },
 		{ TOML2_TOKEN_BRACKET_CLOSE, UNDEFINED,         &toml2_g_pop        },
 		{0},
 	}},
 	{ IARRAY_COM_OR_END, {
 		{ TOML2_TOKEN_COMMA,         IARRAY_VAL,        NULL                },
+		{ TOML2_TOKEN_BRACKET_CLOSE, UNDEFINED,         &toml2_g_pop        },
 		{0},
 	}},
 	{ IARRAY_VAL, {
@@ -556,7 +574,7 @@ static const toml2_g_node_t toml2_g_tables[] = {
 		{ TOML2_TOKEN_IDENTIFIER,    IARRAY_COM_OR_END, &toml2_g_append     },
 		{ TOML2_TOKEN_DATE,          IARRAY_COM_OR_END, &toml2_g_append     },
 		{ TOML2_TOKEN_BRACKET_OPEN,  IARRAY_VAL_OR_END, &toml2_g_push       },
-		{ TOML2_TOKEN_BRACE_OPEN,    IARRAY_COM_OR_END, &toml2_g_push       },
+		{ TOML2_TOKEN_BRACE_OPEN,    ITABLE_ID_OR_END,  &toml2_g_push       },
 		{0},
 	}},
 	{ ITABLE_ID_OR_END, {
@@ -578,9 +596,14 @@ static const toml2_g_node_t toml2_g_tables[] = {
 		{ TOML2_TOKEN_BRACE_OPEN,    ITABLE_ID_OR_END,  &toml2_g_push       },
 		{0},
 	}},
-	{ ITABLE_ID_OR_END, {
-		{ TOML2_TOKEN_STRING,        ITABLE_COLON,      &toml2_g_name       },
+	{ ITABLE_COM_OR_END, {
+		{ TOML2_TOKEN_COMMA,         ITABLE_ID,         NULL                },
 		{ TOML2_TOKEN_BRACE_CLOSE,   UNDEFINED,         &toml2_g_pop        },
+		{0},
+	}},
+	{ ITABLE_ID, {
+		{ TOML2_TOKEN_STRING,        ITABLE_COLON,     &toml2_g_name        },
+		{0},
 	}},
 	{ NEWLINE, {
 		{ TOML2_TOKEN_NEWLINE,       START_LINE,       NULL                 },
@@ -659,7 +682,7 @@ toml2_parse(toml2_t *root, const char *data, size_t datalen)
 			}
 		}
 
-		if (UNDEFINED != next) {
+		if (UNDEFINED != next->next) {
 			mode = next->next;
 		}
 	}
