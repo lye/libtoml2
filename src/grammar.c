@@ -88,11 +88,20 @@ typedef struct {
 }
 toml2_frame_t;
 
+typedef struct {
+	toml2_lex_t *lex;
+	size_t stack_len;
+	size_t stack_cap;
+	bool new_slot;
+	toml2_frame_t *stack;
+}
+toml2_parse_t;
+
 static int
 toml2_frame_new_slot(
+	toml2_parse_t *p,
 	toml2_frame_t *top,
 	toml2_frame_t *out,
-	toml2_lex_t *lex,
 	toml2_token_t *tok
 ) {
 	if (0 == top->doc->type) {
@@ -105,11 +114,12 @@ toml2_frame_new_slot(
 		return TOML2_INTERNAL_ERROR;
 	}
 
-	char *name = toml2_token_utf8(lex, tok);
+	char *name = toml2_token_utf8(p->lex, tok);
 	toml2_t *doc = toml2_get(top->doc, name);
 	if (NULL != doc) {
 		// Just free the name, it's already set.
 		free(name);
+		p->new_slot = false;
 	}
 	else {
 		// Otherwise need to allocate a new toml2_t and give it the name.
@@ -124,6 +134,7 @@ toml2_frame_new_slot(
 
 		RB_INSERT(toml2_tree_t, &top->doc->tree, doc);
 		top->doc->tree_len += 1;
+		p->new_slot = true;
 	}
 
 	out->doc = doc;
@@ -196,14 +207,6 @@ toml2_frame_save(toml2_frame_t *top, toml2_lex_t *lex, toml2_token_t *tok)
 	return 0;
 }
 
-typedef struct {
-	toml2_lex_t *lex;
-	size_t stack_len;
-	size_t stack_cap;
-	toml2_frame_t *stack;
-}
-toml2_parse_t;
-
 static void
 toml2_parse_init(toml2_parse_t *p, toml2_lex_t *lex)
 {
@@ -271,14 +274,9 @@ toml2_g_subfield(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 	}
 
 	toml2_frame_t new;
-	int ret = toml2_frame_new_slot(top, &new, p->lex, tok);
+	int ret = toml2_frame_new_slot(p, top, &new, tok);
 	if (0 != ret) {
 		return ret;
-	}
-
-	if (TABLE_ID == *m) {
-		// Force to a table to allow empty tables.
-		new.doc->type = TOML2_TABLE;
 	}
 
 	*top = new;
@@ -310,6 +308,31 @@ toml2_g_subtable(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 	new.doc->type = TOML2_TABLE;
 
 	*top = new;
+
+	return 0;
+}
+
+// toml2_g_endtable does misc. cleanup for the end of a table declaration.
+static int
+toml2_g_endtable(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
+{
+	toml2_frame_t *top = toml2_parse_top(p);
+	if (NULL == top) {
+		return TOML2_INTERNAL_ERROR;
+	}
+
+	if (0 == top->doc->type) {
+		// Force to a table to allow empty tables.
+		top->doc->type = TOML2_TABLE;
+	}
+	else if (TOML2_TABLE != top->doc->type) {
+		return TOML2_INTERNAL_ERROR;
+	}
+
+	// Ensure that this is a new table.
+	if (!p->new_slot) {
+		return TOML2_TABLE_REASSIGNED;
+	}
 
 	return 0;
 }
@@ -346,7 +369,7 @@ toml2_g_name(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 	toml2_frame_t new;
 	int ret;
 
-	if (0 != (ret = toml2_frame_new_slot(top, &new, p->lex, tok))) {
+	if (0 != (ret = toml2_frame_new_slot(p, top, &new, tok))) {
 		return ret;
 	}
 
@@ -544,7 +567,7 @@ static const toml2_g_node_t toml2_g_tables[] = {
 	}},
 	{ TABLE_DOT_OR_END, {
 		{ TOML2_TOKEN_DOT,           TABLE_ID,         NULL                 },
-		{ TOML2_TOKEN_BRACKET_CLOSE, NEWLINE,          NULL                 },
+		{ TOML2_TOKEN_BRACKET_CLOSE, NEWLINE,          &toml2_g_endtable    },
 		{0},
 	}},
 	{ ATABLE_ID, {
@@ -701,6 +724,8 @@ toml2_parse(toml2_t *root, const char *data, size_t datalen)
 			goto cleanup;
 		}
 
+		toml2_parse_mode_t orig_mode = mode;
+
 		if (NULL != next->fn) {
 			ret = next->fn(&parser, &tok, &mode);
 			if (0 != ret) {
@@ -708,7 +733,7 @@ toml2_parse(toml2_t *root, const char *data, size_t datalen)
 			}
 		}
 
-		if (UNDEFINED != next->next) {
+		if (UNDEFINED != next->next && orig_mode == mode) {
 			mode = next->next;
 		}
 	}
