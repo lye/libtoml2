@@ -657,6 +657,10 @@ toml2_lex_double(toml2_lex_t *lex, toml2_token_t *tok, size_t len)
 		lex->err.err = TOML2_INVALID_UNDERSCORE;
 		return 1;
 	}
+	if (!prev_number) {
+		lex->err.err = TOML2_INVALID_DOUBLE;
+		return 1;
+	}
 
 	val *= sign;
 	exponent *= sign_exp;

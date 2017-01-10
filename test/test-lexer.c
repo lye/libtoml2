@@ -410,7 +410,7 @@ END_TEST
 
 START_TEST(fval)
 {
-	toml2_lex_t lexer = check_init("42.");
+	toml2_lex_t lexer = check_init("42.0");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DOUBLE);
 	ck_assert_double_eq(42, tok.fval);
 	check_token(&lexer, TOML2_TOKEN_EOF);
@@ -420,7 +420,7 @@ END_TEST
 
 START_TEST(fval_us)
 {
-	toml2_lex_t lexer = check_init("4_2.");
+	toml2_lex_t lexer = check_init("4_2.0");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DOUBLE);
 	ck_assert_double_eq(42, tok.fval);
 	check_token(&lexer, TOML2_TOKEN_EOF);
@@ -564,6 +564,14 @@ START_TEST(err_fval_neg2)
 {
 	toml2_lex_t lexer = check_init("--4.");
 	check_token_err(&lexer, TOML2_INVALID_DATE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_fval_trail)
+{
+	toml2_lex_t lexer = check_init("4.");
+	check_token_err(&lexer, TOML2_INVALID_DOUBLE);
 	toml2_lex_free(&lexer);
 }
 END_TEST
@@ -779,6 +787,7 @@ suite_lexer()
 		{ "err_fval_e_us2",   &err_fval_e_us2   },
 		{ "err_fval_ee",      &err_fval_ee      },
 		{ "err_fval_neg2",    &err_fval_neg2    },
+		{ "err_fval_trail",   &err_fval_trail   },
 		{ "date",             &date             },
 		{ "date2",            &date2            },
 		{ "date_short",       &date_short       },
