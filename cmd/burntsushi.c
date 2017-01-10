@@ -57,7 +57,7 @@ emit_doc(toml2_t *doc)
 		fprintf(stdout, "{\"type\":\"integer\",\"value\":%ld}", toml2_int(doc));
 	}
 	else if (TOML2_FLOAT == toml2_type(doc)) {
-		fprintf(stdout, "{\"type\":\"float\",\"value\":%f}", toml2_float(doc));
+		fprintf(stdout, "{\"type\":\"float\",\"value\":%lf}", toml2_float(doc));
 	}
 	else if (TOML2_STRING == toml2_type(doc)) {
 		fprintf(stdout, "{\"type\":\"string\",\"value\":");
@@ -74,6 +74,9 @@ emit_doc(toml2_t *doc)
 	}
 	else if (TOML2_DATE == toml2_type(doc)) {
 		fprintf(stdout, "hello");
+	}
+	else {
+		fprintf(stdout, "undefined");
 	}
 }
 

@@ -121,10 +121,10 @@ toml2_frame_new_slot(
 
 		toml2_init(doc);
 		doc->name = name;
-	}
 
-	RB_INSERT(toml2_tree_t, &top->doc->tree, doc);
-	top->doc->tree_len += 1;
+		RB_INSERT(toml2_tree_t, &top->doc->tree, doc);
+		top->doc->tree_len += 1;
+	}
 
 	out->doc = doc;
 	out->prev_mode = 0;
@@ -274,6 +274,11 @@ toml2_g_subfield(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 	int ret = toml2_frame_new_slot(top, &new, p->lex, tok);
 	if (0 != ret) {
 		return ret;
+	}
+
+	if (TABLE_ID == *m) {
+		// Force to a table to allow empty tables.
+		new.doc->type = TOML2_TABLE;
 	}
 
 	*top = new;
