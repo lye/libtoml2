@@ -371,7 +371,8 @@ toml2_g_save(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 }
 
 // toml2_g_append appends a value to the list in the top frame, then persists
-// the current token to it. The current frame is unchanged.
+// the current token to it. The current frame is unchanged. If the list is 
+// not empty, the new value must be the same type as the first value.
 static int
 toml2_g_append(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 {
@@ -395,6 +396,14 @@ toml2_g_append(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 	if (0 != (ret = toml2_frame_save(&new, p->lex, tok))) {
 		return ret;
 	}
+
+	if (1 < top->doc->ary_len) {
+		toml2_type_t old = top->doc->ary[0].type;
+		toml2_type_t new = top->doc->ary[1].type;
+		if (old != new) {
+			return TOML2_MIXED_LIST;
+		}
+	}	
 
 	return 0;
 }

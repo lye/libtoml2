@@ -10,6 +10,15 @@ check_init(const char *str)
 	return doc;
 }
 
+static void
+check_err(toml2_errcode_t err, const char *str)
+{
+	toml2_t doc;
+	toml2_init(&doc);
+	ck_assert_int_eq(err, toml2_parse(&doc, str, strlen(str)));
+	toml2_free(&doc);
+}
+
 START_TEST(init_free)
 {
 	toml2_t doc;
@@ -155,24 +164,31 @@ START_TEST(inline_obj_ary)
 }
 END_TEST
 
+START_TEST(err_mixed_inline_list)
+{
+	check_err(TOML2_MIXED_LIST, "x = [1, '2']");
+}
+END_TEST
+
 Suite*
 suite_grammar()
 {
 	tcase_t tests[] = {
-		{ "init_free",        &init_free        },
-		{ "basic_table",      &basic_table      },
-		{ "root_value",       &root_value       },
-		{ "newlines",         &newlines         },
-		{ "comments",         &comments         },
-		{ "two_tables",       &two_tables       },
-		{ "table_ary",        &table_ary        },
-		{ "table_with_ary",   &table_with_ary   },
-		{ "inline_ary",       &inline_ary       },
-		{ "inline_obj",       &inline_obj       },
-		{ "empty_inline_ary", &empty_inline_ary },
-		{ "empty_inline_obj", &empty_inline_obj },
-		{ "inline_ary_obj",   &inline_ary_obj   },
-		{ "inline_obj_ary",   &inline_obj_ary   },
+		{ "init_free",             &init_free             },
+		{ "basic_table",           &basic_table           },
+		{ "root_value",            &root_value            },
+		{ "newlines",              &newlines              },
+		{ "comments",              &comments              },
+		{ "two_tables",            &two_tables            },
+		{ "table_ary",             &table_ary             },
+		{ "table_with_ary",        &table_with_ary        },
+		{ "inline_ary",            &inline_ary            },
+		{ "inline_obj",            &inline_obj            },
+		{ "empty_inline_ary",      &empty_inline_ary      },
+		{ "empty_inline_obj",      &empty_inline_obj      },
+		{ "inline_ary_obj",        &inline_ary_obj        },
+		{ "inline_obj_ary",        &inline_obj_ary        },
+		{ "err_mixed_inline_list", &err_mixed_inline_list },
 	};
 
 	return tcase_build_suite("grammar", tests, sizeof(tests));

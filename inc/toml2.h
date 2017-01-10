@@ -41,6 +41,7 @@ enum toml2_errcode_t {
 	TOML2_PARSE_ERROR          = 15,
 	TOML2_MISPLACED_IDENTIFIER = 16,
 	TOML2_LIST_REASSIGNED      = 17,
+	TOML2_MIXED_LIST           = 18,
 };
 
 struct toml2_err_t {
