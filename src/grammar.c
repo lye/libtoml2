@@ -14,7 +14,7 @@ toml2_cmp(const void *lhs, const void *rhs)
 	const toml2_t *l = lhs;
 	const toml2_t *r = rhs;
 
-	if (NULL == l || NULL == r) {
+	if (NULL == l || NULL == r || NULL == l->name || NULL == r->name) {
 		// uhh.
 		kill(getpid(), SIGTRAP);
 		return l == r ? 0 : (l == NULL ? 1 : -1);
@@ -107,7 +107,12 @@ toml2_frame_new_slot(
 
 	char *name = toml2_token_utf8(lex, tok);
 	toml2_t *doc = toml2_get(top->doc, name);
-	if (NULL == doc) {
+	if (NULL != doc) {
+		// Just free the name, it's already set.
+		free(name);
+	}
+	else {
+		// Otherwise need to allocate a new toml2_t and give it the name.
 		doc = malloc(sizeof(toml2_t));
 		if (NULL == doc) {
 			free(name);

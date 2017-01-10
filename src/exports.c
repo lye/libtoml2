@@ -51,20 +51,24 @@ toml2_t*
 toml2_get_path(toml2_t *this, const char *name)
 {
 	char *dup = strdup(name);
-	char *work = dup;
+	if (NULL == dup) {
+		// XXX: It would be nice to propagate ENOMEM better.
+		return NULL;
+	}
 
-	while (this != NULL) {
-		char *tmp = strtok_r(work, ".", &work);
-		if (NULL == tmp) {
-			break;
-		}
+	char *work, *tmp;
 
+	for (
+		work = strtok_r(dup, ".", &tmp);
+		NULL != work && this != NULL;
+		work = strtok_r(NULL, ".", &tmp)
+	) {
 		if (TOML2_TABLE == this->type) {
-			this = toml2_get(this, tmp);
+			this = toml2_get(this, work);
 		}
 		else if (TOML2_LIST == this->type) {
 			char *end = NULL;
-			size_t off = strtol(tmp, &end, 10);
+			size_t off = strtol(work, &end, 10);
 
 			if (0 != *end) {
 				this = NULL;
