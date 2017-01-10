@@ -42,7 +42,7 @@ emit_doc(toml2_t *doc)
 		fprintf(stdout, "}");
 	}
 	else if (TOML2_LIST == toml2_type(doc)) {
-		fprintf(stdout, "[");
+		fprintf(stdout, "{\"type\":\"array\",\"value\":[");
 		for (size_t i = 0; i < toml2_len(doc); i += 1) {
 			if (0 != i) {
 				fprintf(stdout, ",");
@@ -51,7 +51,7 @@ emit_doc(toml2_t *doc)
 			toml2_t *subdoc = toml2_index(doc, i);
 			emit_doc(subdoc);
 		}
-		fprintf(stdout, "]");
+		fprintf(stdout, "]}");
 	}
 	else if (TOML2_INT == toml2_type(doc)) {
 		fprintf(stdout, "{\"type\":\"integer\",\"value\":%ld}", toml2_int(doc));
