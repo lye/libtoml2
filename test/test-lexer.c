@@ -709,6 +709,18 @@ START_TEST(id_octopus)
 }
 END_TEST
 
+START_TEST(err_id_comment)
+{
+	toml2_lex_t lexer = check_init("[foo#bar]");
+	check_token(&lexer, TOML2_TOKEN_BRACKET_OPEN);
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_IDENTIFIER);
+	ck_assert_str_eq("foo", toml2_token_dbg_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_COMMENT);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
 START_TEST(basic_table)
 {
 	toml2_lex_t lexer = check_init("[foo]\nbar = 42");
@@ -795,6 +807,7 @@ suite_lexer()
 		{ "id",               &id               },
 		{ "table_decl",       &table_decl       },
 		{ "id_octopus",       &id_octopus       },
+		{ "err_id_comment",   &err_id_comment   },
 		{ "basic_table",      &basic_table      },
 	};
 
