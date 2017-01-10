@@ -1033,7 +1033,8 @@ toml2_token_utf8(toml2_lex_t *lex, toml2_token_t *tok)
 		}
 	}
 
-	char *buf = malloc(dstlen);
+	char *buf = malloc(dstlen + 1);
+	buf[dstlen] = 0;
 	uerr = 0;
 
 	u_strToUTF8(buf, dstlen, NULL, lex->buf_start + tok->start, srclen, &uerr);
