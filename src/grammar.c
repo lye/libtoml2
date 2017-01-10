@@ -438,6 +438,12 @@ toml2_g_push(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 		if (0 != (ret = toml2_frame_push_slot(top, &new))) {
 			return ret;
 		}
+
+		// Enforce that, if the original top was a list that the new type
+		// matches the first type.
+		if (new.doc->type != top->doc->ary[0].type) {
+			return TOML2_MIXED_LIST;
+		}
 	}
 	else if (0 != top->doc->type) {
 		return TOML2_VALUE_REASSIGNED;
