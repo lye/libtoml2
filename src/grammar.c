@@ -637,6 +637,9 @@ toml2_parse(toml2_t *root, const char *data, size_t datalen)
 		.prev_mode = 0,
 	};
 
+	// root node is always a table.
+	root->type = TOML2_TABLE;
+
 	toml2_parse_init(&parser, &lexer);
 
 	if (0 != (ret = toml2_lex_init(&lexer, data, datalen))) {

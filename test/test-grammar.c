@@ -170,6 +170,14 @@ START_TEST(err_mixed_inline_list)
 }
 END_TEST
 
+START_TEST(empty)
+{
+	toml2_t doc = check_init("");
+	ck_assert_int_eq(TOML2_TABLE, toml2_type(&doc));
+	toml2_free(&doc);
+}
+END_TEST
+
 Suite*
 suite_grammar()
 {
@@ -189,6 +197,7 @@ suite_grammar()
 		{ "inline_ary_obj",        &inline_ary_obj        },
 		{ "inline_obj_ary",        &inline_obj_ary        },
 		{ "err_mixed_inline_list", &err_mixed_inline_list },
+		{ "empty",                 &empty                 },
 	};
 
 	return tcase_build_suite("grammar", tests, sizeof(tests));
