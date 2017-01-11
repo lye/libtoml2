@@ -92,7 +92,17 @@ emit_doc(toml2_t *doc)
 		}
 	}
 	else if (TOML2_DATE == toml2_type(doc)) {
-		fprintf(stdout, "hello");
+		char buf[256];
+		struct tm tm = toml2_date(doc);
+		snprintf(
+			buf, sizeof(buf),
+			"%04d-%02d-%02dT%02d:%02d:%02dZ", 
+			tm.tm_year, tm.tm_mon + 1, tm.tm_mday,
+			tm.tm_hour, tm.tm_min, tm.tm_sec
+			// XXX: tm_gmtoff.
+		);
+
+		fprintf(stdout, "{\"type\":\"datetime\", \"value\":\"%s\"}", buf);
 	}
 	else {
 		fprintf(stdout, "undefined");

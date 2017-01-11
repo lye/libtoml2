@@ -220,6 +220,13 @@ START_TEST(sub_empty2)
 }
 END_TEST
 
+START_TEST(datetime)
+{
+	toml2_t doc = check_init("date = 1987-07-05T17:45:00Z");
+	toml2_free(&doc);
+}
+END_TEST
+
 Suite*
 suite_grammar()
 {
@@ -245,6 +252,7 @@ suite_grammar()
 		{ "err_dupe_itable",       &err_dupe_itable       },
 		{ "err_dupe_itable2",      &err_dupe_itable2      },
 		{ "sub_empty2",            &sub_empty2            },
+		{ "datetime",              &datetime              },
 	};
 
 	return tcase_build_suite("grammar", tests, sizeof(tests));

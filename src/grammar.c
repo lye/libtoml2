@@ -588,10 +588,11 @@ static const toml2_g_node_t toml2_g_tables[] = {
 		{0},
 	}},
 	{ VALUE, {
-		{ TOML2_TOKEN_IDENTIFIER,    NEWLINE,           &toml2_g_save       },
 		{ TOML2_TOKEN_STRING,        NEWLINE,           &toml2_g_save       },
 		{ TOML2_TOKEN_INT,           NEWLINE,           &toml2_g_save       },
 		{ TOML2_TOKEN_DOUBLE,        NEWLINE,           &toml2_g_save       },
+		{ TOML2_TOKEN_IDENTIFIER,    NEWLINE,           &toml2_g_save       },
+		{ TOML2_TOKEN_DATE,          NEWLINE,           &toml2_g_save       },
 		{ TOML2_TOKEN_BRACKET_OPEN,  IARRAY_VAL_OR_END, &toml2_g_push       },
 		{ TOML2_TOKEN_BRACE_OPEN,    ITABLE_ID_OR_END,  &toml2_g_push       },
 		{0},
