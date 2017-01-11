@@ -195,7 +195,19 @@ START_TEST(err_dupe_table)
 }
 END_TEST
 
-START_TEST(sub_empty_2)
+START_TEST(err_dupe_itable)
+{
+	check_err(TOML2_VALUE_REASSIGNED, "[a.b]\n[a]\nb={}\n");
+}
+END_TEST
+
+START_TEST(err_dupe_itable2)
+{
+	check_err(TOML2_TABLE_REASSIGNED, "[a]\nb={}\n[a.b]\n");
+}
+END_TEST
+
+START_TEST(sub_empty2)
 {
 	toml2_t doc = check_init("[a.b.c]\n[a]\n");
 	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "a")));
@@ -230,7 +242,9 @@ suite_grammar()
 		{ "empty",                 &empty                 },
 		{ "sub_empty",             &sub_empty             },
 		{ "err_dupe_table",        &err_dupe_table        },
-		{ "sub_empty_2",           &sub_empty_2           },
+		{ "err_dupe_itable",       &err_dupe_itable       },
+		{ "err_dupe_itable2",      &err_dupe_itable2      },
+		{ "sub_empty2",            &sub_empty2            },
 	};
 
 	return tcase_build_suite("grammar", tests, sizeof(tests));

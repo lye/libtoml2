@@ -485,6 +485,7 @@ toml2_g_push(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 	}
 	else if (TOML2_TOKEN_BRACE_OPEN == tok->type) {
 		new.doc->type = TOML2_TABLE;
+		new.doc->declared = true;
 	}
 	else {
 		return TOML2_INTERNAL_ERROR;
