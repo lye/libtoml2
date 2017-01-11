@@ -72,6 +72,7 @@ struct toml2_t {
 		struct {
 			size_t tree_len;
 			toml2_tree_t tree;
+			bool declared;
 		};
 
 		const char *sval;

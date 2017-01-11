@@ -189,6 +189,25 @@ START_TEST(sub_empty)
 }
 END_TEST
 
+START_TEST(err_dupe_table)
+{
+	check_err(TOML2_TABLE_REASSIGNED, "[a]\n[a]\n");
+}
+END_TEST
+
+START_TEST(sub_empty_2)
+{
+	toml2_t doc = check_init("[a.b.c]\n[a]\n");
+	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "a")));
+	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "a.b")));
+	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "a.b.c")));
+	ck_assert_int_eq(1, toml2_len(toml2_get_path(&doc, "a")));
+	ck_assert_int_eq(1, toml2_len(toml2_get_path(&doc, "a.b")));
+	ck_assert_int_eq(0, toml2_len(toml2_get_path(&doc, "a.b.c")));
+	toml2_free(&doc);
+}
+END_TEST
+
 Suite*
 suite_grammar()
 {
@@ -210,6 +229,8 @@ suite_grammar()
 		{ "err_mixed_inline_list", &err_mixed_inline_list },
 		{ "empty",                 &empty                 },
 		{ "sub_empty",             &sub_empty             },
+		{ "err_dupe_table",        &err_dupe_table        },
+		{ "sub_empty_2",           &sub_empty_2           },
 	};
 
 	return tcase_build_suite("grammar", tests, sizeof(tests));

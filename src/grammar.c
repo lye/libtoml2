@@ -92,7 +92,6 @@ typedef struct {
 	toml2_lex_t *lex;
 	size_t stack_len;
 	size_t stack_cap;
-	bool new_slot;
 	toml2_frame_t *stack;
 }
 toml2_parse_t;
@@ -119,7 +118,6 @@ toml2_frame_new_slot(
 	if (NULL != doc) {
 		// Just free the name, it's already set.
 		free(name);
-		p->new_slot = false;
 	}
 	else {
 		// Otherwise need to allocate a new toml2_t and give it the name.
@@ -134,7 +132,6 @@ toml2_frame_new_slot(
 
 		RB_INSERT(toml2_tree_t, &top->doc->tree, doc);
 		top->doc->tree_len += 1;
-		p->new_slot = true;
 	}
 
 	out->doc = doc;
@@ -330,9 +327,10 @@ toml2_g_endtable(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 	}
 
 	// Ensure that this is a new table.
-	if (!p->new_slot) {
+	if (top->doc->declared) {
 		return TOML2_TABLE_REASSIGNED;
 	}
+	top->doc->declared = true;
 
 	return 0;
 }
