@@ -636,7 +636,7 @@ toml2_lex_double(toml2_lex_t *lex, toml2_token_t *tok, size_t len)
 					break;
 
 				case MODE_FRACTION:
-					val += ((double) (ch - '0')) / ((relpos + 1) * 10);
+					val += ((double) (ch - '0')) / pow(10, (relpos + 1));
 					break;
 
 				case MODE_EXPONENT:

@@ -458,6 +458,16 @@ START_TEST(fval_d)
 }
 END_TEST
 
+START_TEST(fval_d2)
+{
+	toml2_lex_t lexer = check_init("56.234");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DOUBLE);
+	ck_assert_double_eq(56.234, tok.fval);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
 START_TEST(fval_de)
 {
 	toml2_lex_t lexer = check_init("4.2e2");
@@ -786,6 +796,7 @@ suite_lexer()
 		{ "fval_e",           &fval_e           },
 		{ "fval_e2",          &fval_e2          },
 		{ "fval_d",           &fval_d           },
+		{ "fval_d2",          &fval_d2          },
 		{ "fval_de",          &fval_de          },
 		{ "fval_neg",         &fval_neg         },
 		{ "fval_neg_e",       &fval_neg_e       },
