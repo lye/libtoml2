@@ -66,10 +66,10 @@ emit_doc(toml2_t *doc)
 	}
 	else if (TOML2_BOOL == toml2_type(doc)) {
 		if (toml2_bool(doc)) {
-			fprintf(stdout, "{\"type\":\"string\",\"value\":true}");
+			fprintf(stdout, "{\"type\":\"bool\",\"value\":\"true\"}");
 		}
 		else {
-			fprintf(stdout, "{\"type\":\"string\",\"value\":false}");
+			fprintf(stdout, "{\"type\":\"bool\",\"value\":\"false\"}");
 		}
 	}
 	else if (TOML2_DATE == toml2_type(doc)) {
@@ -97,6 +97,7 @@ main(int argc, char *argv[])
 
 	int ret = toml2_parse(&doc, data, strlen(data));
 	if (0 != ret) {
+		fprintf(stderr, "Error %d\n", ret);
 		return ret;
 	}
 
