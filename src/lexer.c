@@ -493,6 +493,7 @@ toml2_lex_quote_any(toml2_lex_t *lex, toml2_token_t *tok, uint32_t flags)
 	}
 	else {
 		// Empty quote.
+		toml2_lex_advance_n(lex, 2);
 		return toml2_lex_emit(lex, tok, 0, TOML2_TOKEN_STRING);
 	}
 }

@@ -105,6 +105,16 @@ START_TEST(squote_bs2)
 }
 END_TEST
 
+START_TEST(squote_empty)
+{
+	toml2_lex_t lexer = check_init("''");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
+	ck_assert_str_eq("", toml2_token_dbg_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
 START_TEST(err_squote_nl)
 {
 	toml2_lex_t lexer = check_init("'h\nello");
@@ -175,6 +185,26 @@ START_TEST(dquote_octopus)
 }
 END_TEST
 
+START_TEST(dquote_empty)
+{
+	toml2_lex_t lexer = check_init("\"\"");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
+	ck_assert_str_eq("", toml2_token_dbg_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(dquote_comment)
+{
+	toml2_lex_t lexer = check_init("\"###\"");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
+	ck_assert_str_eq("###", toml2_token_dbg_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
 START_TEST(err_dquote_u_bad)
 {
 	toml2_lex_t lexer = check_init("\"\\uabcq\"");
@@ -195,16 +225,6 @@ START_TEST(err_dquote_u_eof)
 
 	lexer = check_init("\"\\U00abc\"");
 	check_token_err(&lexer, TOML2_INVALID_ESCAPE);
-	toml2_lex_free(&lexer);
-}
-END_TEST
-
-START_TEST(dquote_comment)
-{
-	toml2_lex_t lexer = check_init("\"###\"");
-	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
-	ck_assert_str_eq("###", toml2_token_dbg_utf8(&lexer, &tok));
-	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
 END_TEST
@@ -761,6 +781,7 @@ suite_lexer()
 		{ "squote",           &squote           },
 		{ "squote_bs",        &squote_bs        },
 		{ "squote_bs2",       &squote_bs2       },
+		{ "squote_empty",     &squote_empty     },
 		{ "err_squote_nl",    &err_squote_nl    },
 		{ "err_squote_eof",   &err_squote_eof   },
 		{ "dquote",           &dquote           },
@@ -768,9 +789,10 @@ suite_lexer()
 		{ "err_dquote_bs",    &err_dquote_bs    },
 		{ "dquote_u",         &dquote_u         },
 		{ "dquote_octopus",   &dquote_octopus   },
+		{ "dquote_empty",     &dquote_empty     },
+		{ "dquote_comment",   &dquote_comment   },
 		{ "err_dquote_u_bad", &err_dquote_u_bad },
 		{ "err_dquote_u_eof", &err_dquote_u_eof },
-		{ "dquote_comment",   &dquote_comment   },
 		{ "tdquote",          &tdquote          },
 		{ "tdquote_nl",       &tdquote_nl       },
 		{ "tdquote_bsnl",     &tdquote_bsnl     },
