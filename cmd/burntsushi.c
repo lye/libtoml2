@@ -17,6 +17,21 @@ emit_escaped(const char *str)
 		else if ('\\' == c) {
 			fprintf(stdout, "\\\\");
 		}
+		else if ('\n' == c) {
+			fprintf(stdout, "\\n");
+		}
+		else if ('\b' == c) {
+			fprintf(stdout, "\\b");
+		}
+		else if ('\t' == c) {
+			fprintf(stdout, "\\t");
+		}
+		else if ('\r' == c) {
+			fprintf(stdout, "\\r");
+		}
+		else if ('\f' == c) {
+			fprintf(stdout, "\\f");
+		}
 		else {
 			fprintf(stdout, "%.1s", &c);
 		}
