@@ -54,7 +54,9 @@ emit_doc(toml2_t *doc)
 		fprintf(stdout, "]}");
 	}
 	else if (TOML2_INT == toml2_type(doc)) {
-		fprintf(stdout, "{\"type\":\"integer\",\"value\":%ld}", toml2_int(doc));
+		char buf[256];
+		snprintf(buf, sizeof(buf), "%ld", toml2_int(doc));
+		fprintf(stdout, "{\"type\":\"integer\",\"value\":\"%s\"}", buf);
 	}
 	else if (TOML2_FLOAT == toml2_type(doc)) {
 		char buf[256];
