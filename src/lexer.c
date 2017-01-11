@@ -387,16 +387,20 @@ toml2_lex_tquote(toml2_lex_t *lex, toml2_token_t *tok, uint32_t flags)
 		return 1;
 	}
 	else if ('\n' == ch) {
-		toml2_lex_advance(lex, true);
-		toml2_lex_eat_whitespace(lex);
+		while ('\n' == toml2_lex_peek(lex, 0)) {
+			toml2_lex_advance(lex, true);
+			toml2_lex_eat_whitespace(lex);
+		}
 	}
 	else if ('\\' == ch && '\n' == toml2_lex_peek(lex, 1)) {
 		// XXX: The spec is a bit ambiguous; not sure if this requires triple
 		// double quotes or also works with triple singles. Just making it
 		// work with both now.
 		toml2_lex_advance(lex, false);
-		toml2_lex_advance(lex, true);
-		toml2_lex_eat_whitespace(lex);
+		while ('\n' == toml2_lex_peek(lex, 0)) {
+			toml2_lex_advance(lex, true);
+			toml2_lex_eat_whitespace(lex);
+		}
 	}
 
 	// Then look for the triple end, noting that with """ \\n trims whitespace
@@ -427,7 +431,11 @@ toml2_lex_tquote(toml2_lex_t *lex, toml2_token_t *tok, uint32_t flags)
 			lex->line += 1;
 			lex->col = 1;
 
-			while (toml2_is_whitespace(toml2_lex_peek(lex, pos + 1))) {
+			for (
+				UChar tmp = toml2_lex_peek(lex, pos + 1);
+				toml2_is_whitespace(tmp) || '\n' == tmp;
+				tmp = toml2_lex_peek(lex, pos + 1)
+			) {
 				lex->col += 1;
 				pos += 1;
 			}

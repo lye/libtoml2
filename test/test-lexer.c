@@ -279,6 +279,26 @@ START_TEST(tdquote_bs)
 }
 END_TEST
 
+START_TEST(tdquote_ws)
+{
+	toml2_lex_t lexer = check_init("\"\"\"\n   \t\n \r   \n hello\"\"\"");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
+	ck_assert_str_eq("hello", toml2_token_dbg_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(tdquote_bsws)
+{
+	toml2_lex_t lexer = check_init("\"\"\"foo\\\n \t\n bar\"\"\"");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_STRING);
+	ck_assert_str_eq("foobar", toml2_token_dbg_utf8(&lexer, &tok));
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
 START_TEST(err_tdquote_eof)
 {
 	toml2_lex_t lexer = check_init("\"\"\"foo\"\"");
@@ -798,6 +818,8 @@ suite_lexer()
 		{ "tdquote_bsnl",     &tdquote_bsnl     },
 		{ "tdquote_nlnl",     &tdquote_nlnl     },
 		{ "tdquote_bs",       &tdquote_bs       },
+		{ "tdquote_ws",       &tdquote_ws       },
+		{ "tdquote_bsws",     &tdquote_bsws     },
 		{ "err_tdquote_eof",  &err_tdquote_eof  },
 		{ "tsquote",          &tsquote          },
 		{ "tsquote_nl",       &tsquote_nl       },
