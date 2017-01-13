@@ -244,6 +244,18 @@ START_TEST(err_iarray_comma)
 }
 END_TEST
 
+START_TEST(iarray_newlines)
+{
+	toml2_t doc = check_init("x = [ \n 1, \n 2 \n, 3 \n ]");
+	ck_assert_int_eq(TOML2_LIST, toml2_type(toml2_get_path(&doc, "x")));
+	ck_assert_int_eq(3, toml2_len(toml2_get_path(&doc, "x")));
+	ck_assert_int_eq(1, toml2_int(toml2_get_path(&doc, "x.0")));
+	ck_assert_int_eq(2, toml2_int(toml2_get_path(&doc, "x.1")));
+	ck_assert_int_eq(3, toml2_int(toml2_get_path(&doc, "x.2")));
+	toml2_free(&doc);
+}
+END_TEST
+
 Suite*
 suite_grammar()
 {
@@ -272,6 +284,7 @@ suite_grammar()
 		{ "datetime",              &datetime              },
 		{ "iarray_trail_comma",    &iarray_trail_comma    },
 		{ "err_iarray_comma",      &err_iarray_comma      },
+		{ "iarray_newlines",       &iarray_newlines       },
 	};
 
 	return tcase_build_suite("grammar", tests, sizeof(tests));

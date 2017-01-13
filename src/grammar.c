@@ -540,7 +540,7 @@ toml2_g_trans_t;
 
 typedef struct {
 	toml2_parse_mode_t mode;
-	toml2_g_trans_t transitions[9];
+	toml2_g_trans_t transitions[10];
 }
 toml2_g_node_t;
 
@@ -606,11 +606,13 @@ static const toml2_g_node_t toml2_g_tables[] = {
 		{ TOML2_TOKEN_BRACKET_OPEN,  IARRAY_VAL_OR_END, &toml2_g_push       },
 		{ TOML2_TOKEN_BRACE_OPEN,    ITABLE_ID_OR_END,  &toml2_g_push       },
 		{ TOML2_TOKEN_BRACKET_CLOSE, UNDEFINED,         &toml2_g_pop        },
+		{ TOML2_TOKEN_NEWLINE,       IARRAY_VAL_OR_END, NULL                },
 		{0},
 	}},
 	{ IARRAY_COM_OR_END, {
 		{ TOML2_TOKEN_COMMA,         IARRAY_VAL,        NULL                },
 		{ TOML2_TOKEN_BRACKET_CLOSE, UNDEFINED,         &toml2_g_pop        },
+		{ TOML2_TOKEN_NEWLINE,       IARRAY_COM_OR_END, NULL                },
 		{0},
 	}},
 	{ IARRAY_VAL, {
@@ -622,15 +624,18 @@ static const toml2_g_node_t toml2_g_tables[] = {
 		{ TOML2_TOKEN_BRACKET_OPEN,  IARRAY_VAL_OR_END, &toml2_g_push       },
 		{ TOML2_TOKEN_BRACE_OPEN,    ITABLE_ID_OR_END,  &toml2_g_push       },
 		{ TOML2_TOKEN_BRACKET_CLOSE, UNDEFINED,         &toml2_g_pop        },
+		{ TOML2_TOKEN_NEWLINE,       IARRAY_VAL,        NULL                },
 		{0},
 	}},
 	{ ITABLE_ID_OR_END, {
 		{ TOML2_TOKEN_STRING,        ITABLE_COLON,      &toml2_g_name       },
 		{ TOML2_TOKEN_BRACE_CLOSE,   UNDEFINED,         &toml2_g_pop        },
+		{ TOML2_TOKEN_NEWLINE,       ITABLE_ID_OR_END,  NULL                },
 		{0}
 	}},
 	{ ITABLE_COLON, {
 		{ TOML2_TOKEN_COLON,         ITABLE_VAL,        NULL                },
+		{ TOML2_TOKEN_NEWLINE,       ITABLE_COLON,      NULL                },
 		{0}
 	}},
 	{ ITABLE_VAL, {
@@ -641,15 +646,18 @@ static const toml2_g_node_t toml2_g_tables[] = {
 		{ TOML2_TOKEN_DATE,          ITABLE_COM_OR_END, &toml2_g_save       },
 		{ TOML2_TOKEN_BRACKET_OPEN,  IARRAY_VAL_OR_END, &toml2_g_push       },
 		{ TOML2_TOKEN_BRACE_OPEN,    ITABLE_ID_OR_END,  &toml2_g_push       },
+		{ TOML2_TOKEN_NEWLINE,       ITABLE_VAL,        NULL                },
 		{0},
 	}},
 	{ ITABLE_COM_OR_END, {
 		{ TOML2_TOKEN_COMMA,         ITABLE_ID,         NULL                },
 		{ TOML2_TOKEN_BRACE_CLOSE,   UNDEFINED,         &toml2_g_pop        },
+		{ TOML2_TOKEN_NEWLINE,       ITABLE_COM_OR_END, NULL                },
 		{0},
 	}},
 	{ ITABLE_ID, {
-		{ TOML2_TOKEN_STRING,        ITABLE_COLON,     &toml2_g_name        },
+		{ TOML2_TOKEN_STRING,        ITABLE_COLON,      &toml2_g_name       },
+		{ TOML2_TOKEN_NEWLINE,       ITABLE_ID,         NULL                },
 		{0},
 	}},
 	{ NEWLINE, {
