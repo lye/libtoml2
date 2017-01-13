@@ -621,6 +621,7 @@ static const toml2_g_node_t toml2_g_tables[] = {
 		{ TOML2_TOKEN_DATE,          IARRAY_COM_OR_END, &toml2_g_append     },
 		{ TOML2_TOKEN_BRACKET_OPEN,  IARRAY_VAL_OR_END, &toml2_g_push       },
 		{ TOML2_TOKEN_BRACE_OPEN,    ITABLE_ID_OR_END,  &toml2_g_push       },
+		{ TOML2_TOKEN_BRACKET_CLOSE, UNDEFINED,         &toml2_g_pop        },
 		{0},
 	}},
 	{ ITABLE_ID_OR_END, {

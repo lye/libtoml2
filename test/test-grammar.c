@@ -227,6 +227,23 @@ START_TEST(datetime)
 }
 END_TEST
 
+START_TEST(iarray_trail_comma)
+{
+	toml2_t doc = check_init("x = [1, 2,]");
+	ck_assert_int_eq(TOML2_LIST, toml2_type(toml2_get_path(&doc, "x")));
+	ck_assert_int_eq(2, toml2_len(toml2_get_path(&doc, "x")));
+	ck_assert_int_eq(1, toml2_int(toml2_get_path(&doc, "x.0")));
+	ck_assert_int_eq(2, toml2_int(toml2_get_path(&doc, "x.1")));
+	toml2_free(&doc);
+}
+END_TEST
+
+START_TEST(err_iarray_comma)
+{
+	check_err(TOML2_PARSE_ERROR, "x = [,]");
+}
+END_TEST
+
 Suite*
 suite_grammar()
 {
@@ -253,6 +270,8 @@ suite_grammar()
 		{ "err_dupe_itable2",      &err_dupe_itable2      },
 		{ "sub_empty2",            &sub_empty2            },
 		{ "datetime",              &datetime              },
+		{ "iarray_trail_comma",    &iarray_trail_comma    },
+		{ "err_iarray_comma",      &err_iarray_comma      },
 	};
 
 	return tcase_build_suite("grammar", tests, sizeof(tests));
