@@ -453,7 +453,19 @@ toml2_g_push(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 	// to append an entry. Otherwise it should be untyped and we can use it
 	// directly -- replacing the frame.
 	toml2_frame_t new;
+	toml2_type_t new_type;
 	int ret;
+
+	// If the token is [, create a list; if { an object.
+	if (TOML2_TOKEN_BRACKET_OPEN == tok->type) {
+		new_type = TOML2_LIST;
+	}
+	else if (TOML2_TOKEN_BRACE_OPEN == tok->type) {
+		new_type = TOML2_TABLE;
+	}
+	else {
+		return TOML2_INTERNAL_ERROR;
+	}
 
 	if (TOML2_LIST == top->doc->type) {
 		if (0 != (ret = toml2_frame_push_slot(top, &new))) {
@@ -462,7 +474,7 @@ toml2_g_push(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 
 		// Enforce that, if the original top was a list that the new type
 		// matches the first type.
-		if (new.doc->type != top->doc->ary[0].type) {
+		if (top->doc->ary_len > 1 && new_type != top->doc->ary[0].type) {
 			return TOML2_MIXED_LIST;
 		}
 	}
@@ -478,19 +490,9 @@ toml2_g_push(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 	}
 
 	new.prev_mode = *m;
+	new.doc->declared = new.doc->declared || new_type == TOML2_TABLE;
+	new.doc->type = new_type;
 	
-	// If the token is [, create a list; if { an object.
-	if (TOML2_TOKEN_BRACKET_OPEN == tok->type) {
-		new.doc->type = TOML2_LIST;
-	}
-	else if (TOML2_TOKEN_BRACE_OPEN == tok->type) {
-		new.doc->type = TOML2_TABLE;
-		new.doc->declared = true;
-	}
-	else {
-		return TOML2_INTERNAL_ERROR;
-	}
-
 	return toml2_parse_push(p, new);
 }
 
