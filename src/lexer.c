@@ -512,9 +512,12 @@ toml2_lex_int(toml2_lex_t *lex, toml2_token_t *tok, size_t len)
 	uint64_t val = 0;
 	int64_t sign = 1;
 	bool prev_number = false;
+	UChar prev_ch = 0;
+	UChar ch = 0;
 
 	for (size_t pos = 0; pos < len; pos += 1) {
-		UChar ch = toml2_lex_peek(lex, pos);
+		prev_ch = ch;
+		ch = toml2_lex_peek(lex, pos);
 
 		if (pos == 0) {
 			if ('-' == ch) {
@@ -524,6 +527,18 @@ toml2_lex_int(toml2_lex_t *lex, toml2_token_t *tok, size_t len)
 			} else if ('+' == ch) {
 				// pass
 				continue;
+			}
+		}
+
+		// Leading zeros verboten.
+		if ('0' == ch) {
+			if (0 == pos && 1 < len) {
+				lex->err.err = TOML2_INVALID_INT;
+				return 1;
+			}
+			else if (1 == pos && ('+' == prev_ch || '-' == prev_ch)) {
+				lex->err.err = TOML2_INVALID_INT;
+				return 1;
 			}
 		}
 
@@ -585,7 +600,7 @@ toml2_lex_double(toml2_lex_t *lex, toml2_token_t *tok, size_t len)
 	for (size_t pos = 0; pos < len; pos += 1) {
 		ch = toml2_lex_peek(lex, pos);
 
-		if (relpos == 0 && '-' == ch && mode != MODE_FRACTION) {
+		if (0 == relpos && '-' == ch && MODE_FRACTION != mode) {
 			if (MODE_INTEGER == mode) {
 				sign = -1;
 			}
@@ -600,15 +615,30 @@ toml2_lex_double(toml2_lex_t *lex, toml2_token_t *tok, size_t len)
 				lex->err.err = TOML2_INVALID_DOUBLE;
 				return 1;
 			}
-			if (mode != MODE_EXPONENT && mode != MODE_INTEGER) {
+			if (MODE_EXPONENT != mode && MODE_INTEGER != mode) {
 				lex->err.err = TOML2_INVALID_DOUBLE;
 				return 1;
 			}
 			continue;
 		}
 
+		if ('0' == ch && MODE_INTEGER == mode) {
+			// This is allowed if the next character is the int/fraction
+			// separator.
+			if (pos + 1 < len && '.' == toml2_lex_peek(lex, pos + 1)) {
+				prev_number = true;
+				continue;
+			}
+
+			// Otherwise, leading zeros are not allowed.
+			if (0 == relpos || (1 == relpos && -1 == sign)) {
+				lex->err.err = TOML2_INVALID_DOUBLE;
+				return 1;
+			}
+		}
+
 		if ('.' == ch) {
-			if (mode != MODE_INTEGER || 0 == pos) {
+			if (MODE_INTEGER != mode || 0 == pos) {
 				lex->err.err = TOML2_INVALID_DOUBLE;
 				return 1;
 			}

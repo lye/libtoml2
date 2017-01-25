@@ -468,6 +468,16 @@ START_TEST(fval)
 }
 END_TEST
 
+START_TEST(fval_zero)
+{
+	toml2_lex_t lexer = check_init("0.1");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DOUBLE);
+	ck_assert_double_eq(0.1, tok.fval);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
 START_TEST(fval_us)
 {
 	toml2_lex_t lexer = check_init("4_2.0");
@@ -845,6 +855,46 @@ START_TEST(basic_table)
 }
 END_TEST
 
+START_TEST(err_lead_0_f)
+{
+	toml2_lex_t lexer = check_init("04.2");
+	check_token_err(&lexer, TOML2_INVALID_DOUBLE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_lead_0_f_neg)
+{
+	toml2_lex_t lexer = check_init("-04.2");
+	check_token_err(&lexer, TOML2_INVALID_DOUBLE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_lead_0_i)
+{
+	toml2_lex_t lexer = check_init("042");
+	check_token_err(&lexer, TOML2_INVALID_INT);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_lead_0_i_pos)
+{
+	toml2_lex_t lexer = check_init("+042");
+	check_token_err(&lexer, TOML2_INVALID_INT);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_lead_0_i_neg)
+{
+	toml2_lex_t lexer = check_init("-042");
+	check_token_err(&lexer, TOML2_INVALID_INT);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
 Suite*
 suite_lexer()
 {
@@ -893,6 +943,7 @@ suite_lexer()
 		{ "err_ival_last_us", &err_ival_last_us },
 		{ "err_ival_neg2",    &err_ival_neg2    },
 		{ "fval",             &fval             },
+		{ "fval_zero",        &fval_zero        },
 		{ "fval_us",          &fval_us          },
 		{ "fval_plus",        &fval_plus        },
 		{ "err_fval_plus",    &err_fval_plus    },
@@ -926,6 +977,11 @@ suite_lexer()
 		{ "id_octopus",       &id_octopus       },
 		{ "err_id_comment",   &err_id_comment   },
 		{ "basic_table",      &basic_table      },
+		{ "err_lead_0_f",     &err_lead_0_f     },
+		{ "err_lead_0_f_neg", &err_lead_0_f_neg },
+		{ "err_lead_0_i",     &err_lead_0_i     },
+		{ "err_lead_0_i_pos", &err_lead_0_i_pos },
+		{ "err_lead_0_i_neg", &err_lead_0_i_neg },
 	};
 
 	return tcase_build_suite("lexer", tests, sizeof(tests));
