@@ -275,7 +275,6 @@ START_TEST(double_subtable)
 {
 	// {
 	//   x : [
-	//     {},
 	//     {
 	//       y : [{
 	//         z : 1
@@ -285,15 +284,13 @@ START_TEST(double_subtable)
 	// }
 	toml2_t doc = check_init("[[x]]\n[[x.y]]\nz=1");
 	ck_assert_int_eq(TOML2_LIST, toml2_type(toml2_get_path(&doc, "x")));
-	ck_assert_int_eq(2, toml2_len(toml2_get_path(&doc, "x")));
+	ck_assert_int_eq(1, toml2_len(toml2_get_path(&doc, "x")));
 	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "x.0")));
-	ck_assert_int_eq(0, toml2_len(toml2_get_path(&doc, "x.0")));
-	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "x.1")));
-	ck_assert_int_eq(1, toml2_len(toml2_get_path(&doc, "x.1")));
-	ck_assert_int_eq(TOML2_LIST, toml2_type(toml2_get_path(&doc, "x.1.y")));
-	ck_assert_int_eq(1, toml2_len(toml2_get_path(&doc, "x.1.y")));
-	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "x.1.y.0")));
-	ck_assert_int_eq(TOML2_INT, toml2_type(toml2_get_path(&doc, "x.1.y.0.z")));
+	ck_assert_int_eq(1, toml2_len(toml2_get_path(&doc, "x.0")));
+	ck_assert_int_eq(TOML2_LIST, toml2_type(toml2_get_path(&doc, "x.0.y")));
+	ck_assert_int_eq(1, toml2_len(toml2_get_path(&doc, "x.0.y")));
+	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "x.0.y.0")));
+	ck_assert_int_eq(TOML2_INT, toml2_type(toml2_get_path(&doc, "x.0.y.0.z")));
 	toml2_free(&doc);
 }
 END_TEST

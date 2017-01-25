@@ -264,21 +264,25 @@ toml2_g_subfield(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 		top->doc->type = TOML2_TABLE;
 	}
 	else if (TOML2_LIST == top->doc->type) {
-		// If the current frame is a list, create a new entry in the list, 
-		// then append an object to it. This is only allowed for a list marked
-		// as declared (e.g., not inline).
+		// If the current frame is a list, select the last entry in the
+		// list as the current frame. If there is no frame, create it.
 		if (!top->doc->declared) {
 			return TOML2_LIST_REASSIGNED;
 		}
 
-		toml2_frame_t newtop;
-		int err = toml2_frame_push_slot(top, &newtop);
-		if (0 != err) {
-			return err;
+		if (0 != top->doc->ary_len) {
+			top->doc = &top->doc->ary[top->doc->ary_len - 1];
 		}
+		else {
+			toml2_frame_t newtop;
+			int err = toml2_frame_push_slot(top, &newtop);
+			if (0 != err) {
+				return err;
+			}
 
-		*top = newtop;
-		top->doc->declared = true;
+			*top = newtop;
+			top->doc->declared = true;
+		}
 	}
 	else if (TOML2_TABLE != top->doc->type) {
 		return TOML2_TABLE_REASSIGNED;
