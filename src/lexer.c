@@ -595,6 +595,18 @@ toml2_lex_double(toml2_lex_t *lex, toml2_token_t *tok, size_t len)
 			continue;
 		}
 
+		if ('+' == ch) {
+			if (relpos != 0) {
+				lex->err.err = TOML2_INVALID_DOUBLE;
+				return 1;
+			}
+			if (mode != MODE_EXPONENT && mode != MODE_INTEGER) {
+				lex->err.err = TOML2_INVALID_DOUBLE;
+				return 1;
+			}
+			continue;
+		}
+
 		if ('.' == ch) {
 			if (mode != MODE_INTEGER || 0 == pos) {
 				lex->err.err = TOML2_INVALID_DOUBLE;

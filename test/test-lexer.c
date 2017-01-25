@@ -468,6 +468,32 @@ START_TEST(fval_us)
 }
 END_TEST
 
+START_TEST(fval_plus)
+{
+	toml2_lex_t lexer = check_init("+4.2");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DOUBLE);
+	ck_assert_double_eq(4.2, tok.fval);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_fval_plus)
+{
+	toml2_lex_t lexer = check_init("4+2.2");
+	check_token_err(&lexer, TOML2_INVALID_DOUBLE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(err_fval_plus2)
+{
+	toml2_lex_t lexer = check_init("4e2+2");
+	check_token_err(&lexer, TOML2_INVALID_DOUBLE);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
 START_TEST(fval_e)
 {
 	toml2_lex_t lexer = check_init("4e2");
@@ -483,6 +509,26 @@ START_TEST(fval_e2)
 	toml2_lex_t lexer = check_init("4E2");
 	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DOUBLE);
 	ck_assert_double_eq(4e2, tok.fval);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(fval_e3)
+{
+	toml2_lex_t lexer = check_init("4e+2");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DOUBLE);
+	ck_assert_double_eq(4e+2, tok.fval);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
+START_TEST(fval_e4)
+{
+	toml2_lex_t lexer = check_init("4e-2");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_DOUBLE);
+	ck_assert_double_eq(4e-2, tok.fval);
 	check_token(&lexer, TOML2_TOKEN_EOF);
 	toml2_lex_free(&lexer);
 }
@@ -837,8 +883,13 @@ suite_lexer()
 		{ "err_ival_neg2",    &err_ival_neg2    },
 		{ "fval",             &fval             },
 		{ "fval_us",          &fval_us          },
+		{ "fval_plus",        &fval_plus        },
+		{ "err_fval_plus",    &err_fval_plus    },
+		{ "err_fval_plus2",   &err_fval_plus2   },
 		{ "fval_e",           &fval_e           },
 		{ "fval_e2",          &fval_e2          },
+		{ "fval_e3",          &fval_e3          },
+		{ "fval_e4",          &fval_e4          },
 		{ "fval_d",           &fval_d           },
 		{ "fval_d2",          &fval_d2          },
 		{ "fval_de",          &fval_de          },
