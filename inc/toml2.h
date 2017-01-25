@@ -62,6 +62,7 @@ struct toml2_t {
 	toml2_type_t type;
 	const char *name;
 	RB_ENTRY(toml2_t) link;
+	bool declared;
 
 	union {
 		struct {
@@ -72,7 +73,6 @@ struct toml2_t {
 		struct {
 			size_t tree_len;
 			toml2_tree_t tree;
-			bool declared;
 		};
 
 		const char *sval;

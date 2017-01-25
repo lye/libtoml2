@@ -271,6 +271,58 @@ START_TEST(iarray_mixed)
 }
 END_TEST
 
+START_TEST(double_subtable)
+{
+	// {
+	//   x : [
+	//     {},
+	//     {
+	//       y : [{
+	//         z : 1
+	//       }]
+	//     }
+	//   ]
+	// }
+	toml2_t doc = check_init("[[x]]\n[[x.y]]\nz=1");
+	ck_assert_int_eq(TOML2_LIST, toml2_type(toml2_get_path(&doc, "x")));
+	ck_assert_int_eq(2, toml2_len(toml2_get_path(&doc, "x")));
+	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "x.0")));
+	ck_assert_int_eq(0, toml2_len(toml2_get_path(&doc, "x.0")));
+	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "x.1")));
+	ck_assert_int_eq(1, toml2_len(toml2_get_path(&doc, "x.1")));
+	ck_assert_int_eq(TOML2_LIST, toml2_type(toml2_get_path(&doc, "x.1.y")));
+	ck_assert_int_eq(1, toml2_len(toml2_get_path(&doc, "x.1.y")));
+	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "x.1.y.0")));
+	ck_assert_int_eq(TOML2_INT, toml2_type(toml2_get_path(&doc, "x.1.y.0.z")));
+	toml2_free(&doc);
+}
+END_TEST
+
+START_TEST(single_subtable)
+{
+	toml2_t doc = check_init("[[x.y.z]]\nw=42");
+	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "x")));
+	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "x.y")));
+	ck_assert_int_eq(TOML2_LIST, toml2_type(toml2_get_path(&doc, "x.y.z")));
+	ck_assert_int_eq(1, toml2_len(toml2_get_path(&doc, "x.y.z")));
+	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "x.y.z.0")));
+	ck_assert_int_eq(42, toml2_int(toml2_get_path(&doc, "x.y.z.0.w")));
+	toml2_free(&doc);
+}
+END_TEST
+
+START_TEST(err_redeclare_list)
+{
+	check_err(TOML2_LIST_REASSIGNED, "x=[]\n[[x]]");
+}
+END_TEST
+
+START_TEST(err_redeclare_list2)
+{
+	check_err(TOML2_LIST_REASSIGNED, "[x]\ny=[]\n[[x.y]]");
+}
+END_TEST
+
 Suite*
 suite_grammar()
 {
@@ -301,6 +353,10 @@ suite_grammar()
 		{ "err_iarray_comma",      &err_iarray_comma      },
 		{ "iarray_newlines",       &iarray_newlines       },
 		{ "iarray_mixed",          &iarray_mixed          },
+		{ "double_subtable",       &double_subtable       },
+		{ "single_subtable",       &single_subtable       },
+		{ "err_redeclare_list",    &err_redeclare_list    },
+		{ "err_redeclare_list2",   &err_redeclare_list2   },
 	};
 
 	return tcase_build_suite("grammar", tests, sizeof(tests));

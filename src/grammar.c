@@ -263,6 +263,23 @@ toml2_g_subfield(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 	if (0 == top->doc->type) {
 		top->doc->type = TOML2_TABLE;
 	}
+	else if (TOML2_LIST == top->doc->type) {
+		// If the current frame is a list, create a new entry in the list, 
+		// then append an object to it. This is only allowed for a list marked
+		// as declared (e.g., not inline).
+		if (!top->doc->declared) {
+			return TOML2_LIST_REASSIGNED;
+		}
+
+		toml2_frame_t newtop;
+		int err = toml2_frame_push_slot(top, &newtop);
+		if (0 != err) {
+			return err;
+		}
+
+		*top = newtop;
+		top->doc->declared = true;
+	}
 	else if (TOML2_TABLE != top->doc->type) {
 		return TOML2_TABLE_REASSIGNED;
 	}
@@ -292,8 +309,12 @@ toml2_g_subtable(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 
 	if (0 == top->doc->type) {
 		top->doc->type = TOML2_LIST;
+		top->doc->declared = true;
 	}
 	else if (TOML2_LIST != top->doc->type) {
+		return TOML2_LIST_REASSIGNED;
+	}
+	else if (!top->doc->declared) {
 		return TOML2_LIST_REASSIGNED;
 	}
 
@@ -303,6 +324,7 @@ toml2_g_subtable(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 		return ret;
 	}
 	new.doc->type = TOML2_TABLE;
+	new.doc->declared = true;
 
 	*top = new;
 
