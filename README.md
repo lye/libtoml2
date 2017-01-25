@@ -32,6 +32,7 @@ Statically link in `libtoml2.a` and `#include "toml2.h"`. The other headers are 
 
  * No build system is used. Is this an issue? I don't know. I don't mind cmake/autotools but I'm not going to bother hooking them up.
  * Build system only emits static libraries. Dynamic linking is for X11. If you need it, feel free to submit a PR.
+ * It is not yet tested to behave correctly when `malloc` fails.
  * Error reporting is currently very poor.
  * Grammar is poorly expressed. Whoops.
  * Codebase may contain snark.
