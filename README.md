@@ -1,6 +1,6 @@
 ## libtoml2
 
-Because libtoml is a [wreck](https://github.com/lye/libtoml/commit/325b71a5def3ce49fa75ce78036ce144486b6826) and I have more time than wit.
+Because [libtoml](https://github.com/ajwans/libtoml) is a [wreck](https://github.com/lye/libtoml/commit/325b71a5def3ce49fa75ce78036ce144486b6826) and I have more time than wit.
 
 **libtoml2** is a [toml `0.4.0`](https://github.com/toml-lang/toml) parser in C that passes all of the [burntsushi test suite](https://github.com/BurntSushi/toml-test). It should be noted that the burntsushi test suite is for toml `0.2.0`. AFAIK the differences between `0.2.0` and `0.4.0` are non-structural and only add further restrictions (which I _belive_ are handled).
 
@@ -34,4 +34,5 @@ Statically link in `libtoml2.a` and `#include "toml2.h"`. The other headers are 
  * Build system only emits static libraries. Dynamic linking is for X11. If you need it, feel free to submit a PR.
  * Error reporting is currently very poor.
  * Grammar is poorly expressed. Whoops.
+ * Codebase may contain snark.
  * Probably some untested edge-cases. This isn't exactly battle-hardened code.
