@@ -1008,7 +1008,7 @@ toml2_lex_token(toml2_lex_t *lex, toml2_token_t *tok)
 	// [.+-1-9] and are ints, doubles or dates. For the lexer's purposes,
 	// booleans are left as identifiers since they're context-specific.
 	const char v_starts[] = {
-		'+', '-', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.'
+		'+', '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.'
 	};
 	for (size_t i = 0; i < sizeof(v_starts) / sizeof(v_starts[0]); i += 1) {
 		if (v_starts[i] == p) {

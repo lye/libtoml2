@@ -405,6 +405,16 @@ START_TEST(ival_us)
 }
 END_TEST
 
+START_TEST(ival_zero)
+{
+	toml2_lex_t lexer = check_init("0");
+	toml2_token_t tok = check_token(&lexer, TOML2_TOKEN_INT);
+	ck_assert_int_eq(0, tok.ival);
+	check_token(&lexer, TOML2_TOKEN_EOF);
+	toml2_lex_free(&lexer);
+}
+END_TEST
+
 START_TEST(ival_space_nl)
 {
 	toml2_lex_t lexer = check_init("42 \n");
@@ -877,6 +887,7 @@ suite_lexer()
 		{ "ival_plus",        &ival_plus        },
 		{ "ival_neg",         &ival_neg         },
 		{ "ival_us",          &ival_us          },
+		{ "ival_zero",        &ival_zero        },
 		{ "ival_space_nl",    &ival_space_nl    },
 		{ "err_ival_us",      &err_ival_us      },
 		{ "err_ival_last_us", &err_ival_last_us },
