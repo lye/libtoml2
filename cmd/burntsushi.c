@@ -75,7 +75,7 @@ emit_doc(toml2_t *doc)
 	}
 	else if (TOML2_FLOAT == toml2_type(doc)) {
 		char buf[256];
-		snprintf(buf, sizeof(buf), "%lf", toml2_float(doc));
+		snprintf(buf, sizeof(buf), "%.15lf", toml2_float(doc));
 		fprintf(stdout, "{\"type\":\"float\",\"value\":\"%s\"}", buf);
 	}
 	else if (TOML2_STRING == toml2_type(doc)) {
