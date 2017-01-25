@@ -108,7 +108,7 @@ END_TEST
 
 START_TEST(inline_obj)
 {
-	toml2_t doc = check_init("x = {'a':42, 'b':24}");
+	toml2_t doc = check_init("x = {'a'=42, 'b'=24}");
 	ck_assert_int_eq(1, toml2_len(&doc));
 	ck_assert_int_eq(2, toml2_len(toml2_get(&doc, "x")));
 	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get(&doc, "x")));
@@ -142,7 +142,7 @@ END_TEST
 
 START_TEST(inline_ary_obj)
 {
-	toml2_t doc = check_init("x = [ { 'y' : 4 } ]");
+	toml2_t doc = check_init("x = [ { 'y' = 4 } ]");
 	ck_assert_int_eq(1, toml2_len(&doc));
 	ck_assert_int_eq(TOML2_LIST, toml2_type(toml2_get(&doc, "x")));
 	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "x.0")));
@@ -154,7 +154,7 @@ END_TEST
 
 START_TEST(inline_obj_ary)
 {
-	toml2_t doc = check_init("x = { 'y' : [4] }");
+	toml2_t doc = check_init("x = { 'y' = [4] }");
 	ck_assert_int_eq(1, toml2_len(&doc));
 	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get(&doc, "x")));
 	ck_assert_int_eq(TOML2_LIST, toml2_type(toml2_get_path(&doc, "x.y")));
@@ -320,6 +320,16 @@ START_TEST(err_redeclare_list2)
 }
 END_TEST
 
+START_TEST(itable_id)
+{
+	toml2_t doc = check_init("x = { y = 42 }");
+	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "x")));
+	ck_assert_int_eq(TOML2_INT, toml2_type(toml2_get_path(&doc, "x.y")));
+	ck_assert_int_eq(42, toml2_int(toml2_get_path(&doc, "x.y")));
+	toml2_free(&doc);
+}
+END_TEST
+
 Suite*
 suite_grammar()
 {
@@ -354,6 +364,7 @@ suite_grammar()
 		{ "single_subtable",       &single_subtable       },
 		{ "err_redeclare_list",    &err_redeclare_list    },
 		{ "err_redeclare_list2",   &err_redeclare_list2   },
+		{ "itable_id",             &itable_id             },
 	};
 
 	return tcase_build_suite("grammar", tests, sizeof(tests));
