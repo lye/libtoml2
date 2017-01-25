@@ -34,6 +34,7 @@ Statically link in `libtoml2.a` and `#include "toml2.h"`. The other headers are 
  * Build system only emits static libraries. Dynamic linking is for X11. If you need it, feel free to submit a PR.
  * It is not yet tested to behave correctly when `malloc` fails.
  * Parsing of doubles is woefully sub-optimal.
+ * Spaces between `[`/`]` in `[[array-of-tables]]` do not emit an error.
  * Error reporting is currently very poor.
  * Grammar is poorly expressed. Whoops.
  * Codebase may contain snark.
