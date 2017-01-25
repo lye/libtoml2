@@ -57,16 +57,33 @@ emit_doc(toml2_t *doc)
 		fprintf(stdout, "}");
 	}
 	else if (TOML2_LIST == toml2_type(doc)) {
-		fprintf(stdout, "{\"type\":\"array\",\"value\":[");
-		for (size_t i = 0; i < toml2_len(doc); i += 1) {
-			if (0 != i) {
-				fprintf(stdout, ",");
-			}
+		// HACK: This field isn't technically exposed, but poke into it anyway
+		// since the toml-test suite wants them formatted differently for
+		// reasons beyond my mere mortal mind.
+		if (doc->declared) {
+			fprintf(stdout, "[");
+			for (size_t i = 0; i < toml2_len(doc); i += 1) {
+				if (0 != i) {
+					fprintf(stdout, ",");
+				}
 
-			toml2_t *subdoc = toml2_index(doc, i);
-			emit_doc(subdoc);
+				toml2_t *subdoc = toml2_index(doc, i);
+				emit_doc(subdoc);
+			}
+			fprintf(stdout, "]");
 		}
-		fprintf(stdout, "]}");
+		else {
+			fprintf(stdout, "{\"type\":\"array\",\"value\":[");
+			for (size_t i = 0; i < toml2_len(doc); i += 1) {
+				if (0 != i) {
+					fprintf(stdout, ",");
+				}
+
+				toml2_t *subdoc = toml2_index(doc, i);
+				emit_doc(subdoc);
+			}
+			fprintf(stdout, "]}");
+		}
 	}
 	else if (TOML2_INT == toml2_type(doc)) {
 		char buf[256];
