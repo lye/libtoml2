@@ -330,6 +330,35 @@ START_TEST(itable_id)
 }
 END_TEST
 
+START_TEST(numeric_key)
+{
+	toml2_t doc = check_init("42 = 99");
+	ck_assert_int_eq(TOML2_INT, toml2_type(toml2_get_path(&doc, "42")));
+	ck_assert_int_eq(99, toml2_int(toml2_get_path(&doc, "42")));
+	toml2_free(&doc);
+}
+END_TEST
+
+START_TEST(numeric_key2)
+{
+	toml2_t doc = check_init("[42]\nx=99");
+	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "42")));
+	ck_assert_int_eq(TOML2_INT, toml2_type(toml2_get_path(&doc, "42.x")));
+	ck_assert_int_eq(99, toml2_int(toml2_get_path(&doc, "42.x")));
+	toml2_free(&doc);
+}
+END_TEST
+
+START_TEST(numeric_key3)
+{
+	toml2_t doc = check_init("x={42=99}");
+	ck_assert_int_eq(TOML2_TABLE, toml2_type(toml2_get_path(&doc, "x")));
+	ck_assert_int_eq(TOML2_INT, toml2_type(toml2_get_path(&doc, "x.42")));
+	ck_assert_int_eq(99, toml2_int(toml2_get_path(&doc, "x.42")));
+	toml2_free(&doc);
+}
+END_TEST
+
 Suite*
 suite_grammar()
 {
@@ -365,6 +394,9 @@ suite_grammar()
 		{ "err_redeclare_list",    &err_redeclare_list    },
 		{ "err_redeclare_list2",   &err_redeclare_list2   },
 		{ "itable_id",             &itable_id             },
+		{ "numeric_key",           &numeric_key           },
+		{ "numeric_key2",          &numeric_key2          },
+		{ "numeric_key3",          &numeric_key3          },
 	};
 
 	return tcase_build_suite("grammar", tests, sizeof(tests));

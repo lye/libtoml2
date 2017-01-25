@@ -55,9 +55,6 @@ toml2_free(toml2_t *doc)
 	}
 }
 
-// This is where a smart person would pull in a parser generator or something.
-// Alas I am not a smart person.
-
 typedef enum {
 	UNDEFINED,
 	START_LINE,
@@ -109,7 +106,11 @@ toml2_frame_new_slot(
 	if (TOML2_TABLE != top->doc->type) {
 		return TOML2_INTERNAL_ERROR;
 	}
-	if (TOML2_TOKEN_STRING != tok->type && TOML2_TOKEN_IDENTIFIER != tok->type) {
+	if (
+		TOML2_TOKEN_STRING != tok->type &&
+		TOML2_TOKEN_IDENTIFIER != tok->type &&
+		TOML2_TOKEN_INT != tok->type
+	) {
 		return TOML2_INTERNAL_ERROR;
 	}
 
@@ -287,7 +288,11 @@ toml2_g_subfield(toml2_parse_t *p, toml2_token_t *tok, toml2_parse_mode_t *m)
 	else if (TOML2_TABLE != top->doc->type) {
 		return TOML2_TABLE_REASSIGNED;
 	}
-	if (TOML2_TOKEN_STRING != tok->type && TOML2_TOKEN_IDENTIFIER != tok->type) {
+	if (
+		TOML2_TOKEN_STRING != tok->type &&
+		TOML2_TOKEN_IDENTIFIER != tok->type &&
+		TOML2_TOKEN_INT != tok->type
+	) {
 		return TOML2_INTERNAL_ERROR;
 	}
 
@@ -572,11 +577,14 @@ typedef struct {
 }
 toml2_g_node_t;
 
+// This is where a smart person would pull in a parser generator or something.
+// Alas I am not a smart person.
 static const toml2_g_node_t toml2_g_tables[] = {
 	{ START_LINE, {
 		{ TOML2_TOKEN_BRACKET_OPEN,  TABLE_OR_ATABLE,  &toml2_g_reset       },
 		{ TOML2_TOKEN_IDENTIFIER,    VALUE_EQUALS,     &toml2_g_name        },
 		{ TOML2_TOKEN_STRING,        VALUE_EQUALS,     &toml2_g_name        },
+		{ TOML2_TOKEN_INT,           VALUE_EQUALS,     &toml2_g_name        },
 		{ TOML2_TOKEN_EOF,           DONE,             NULL                 },
 		{ TOML2_TOKEN_NEWLINE,       START_LINE,       NULL                 },
 		{0},
@@ -585,11 +593,13 @@ static const toml2_g_node_t toml2_g_tables[] = {
 		{ TOML2_TOKEN_BRACKET_OPEN,  ATABLE_ID,        NULL                 },
 		{ TOML2_TOKEN_IDENTIFIER,    TABLE_DOT_OR_END, &toml2_g_subfield    },
 		{ TOML2_TOKEN_STRING,        TABLE_DOT_OR_END, &toml2_g_subfield    },
+		{ TOML2_TOKEN_INT,           TABLE_DOT_OR_END, &toml2_g_subfield    },
 		{0},
 	}},
 	{ TABLE_ID, {
 		{ TOML2_TOKEN_IDENTIFIER,    TABLE_DOT_OR_END, &toml2_g_subfield    },
 		{ TOML2_TOKEN_STRING,        TABLE_DOT_OR_END, &toml2_g_subfield    },
+		{ TOML2_TOKEN_INT,           TABLE_DOT_OR_END, &toml2_g_subfield    },
 		{0},
 	}},
 	{ TABLE_DOT_OR_END, {
@@ -600,6 +610,7 @@ static const toml2_g_node_t toml2_g_tables[] = {
 	{ ATABLE_ID, {
 		{ TOML2_TOKEN_IDENTIFIER,    ATABLE_DOT_OR_END, &toml2_g_subfield   },
 		{ TOML2_TOKEN_STRING,        ATABLE_DOT_OR_END, &toml2_g_subfield   },
+		{ TOML2_TOKEN_INT,           ATABLE_DOT_OR_END, &toml2_g_subfield   },
 		{0},
 	}},
 	{ ATABLE_DOT_OR_END, {
@@ -656,15 +667,16 @@ static const toml2_g_node_t toml2_g_tables[] = {
 		{0},
 	}},
 	{ ITABLE_ID_OR_END, {
-		{ TOML2_TOKEN_IDENTIFIER,    ITABLE_EQUALS,      &toml2_g_name       },
-		{ TOML2_TOKEN_STRING,        ITABLE_EQUALS,      &toml2_g_name       },
-		{ TOML2_TOKEN_BRACE_CLOSE,   UNDEFINED,          &toml2_g_pop        },
-		{ TOML2_TOKEN_NEWLINE,       ITABLE_ID_OR_END,   NULL                },
+		{ TOML2_TOKEN_IDENTIFIER,    ITABLE_EQUALS,      &toml2_g_name      },
+		{ TOML2_TOKEN_STRING,        ITABLE_EQUALS,      &toml2_g_name      },
+		{ TOML2_TOKEN_INT,           ITABLE_EQUALS,      &toml2_g_name      },
+		{ TOML2_TOKEN_BRACE_CLOSE,   UNDEFINED,          &toml2_g_pop       },
+		{ TOML2_TOKEN_NEWLINE,       ITABLE_ID_OR_END,   NULL               },
 		{0}
 	}},
 	{ ITABLE_EQUALS, {
-		{ TOML2_TOKEN_EQUALS,        ITABLE_VAL,         NULL                },
-		{ TOML2_TOKEN_NEWLINE,       ITABLE_EQUALS,      NULL                },
+		{ TOML2_TOKEN_EQUALS,        ITABLE_VAL,         NULL               },
+		{ TOML2_TOKEN_NEWLINE,       ITABLE_EQUALS,      NULL               },
 		{0}
 	}},
 	{ ITABLE_VAL, {
@@ -685,9 +697,10 @@ static const toml2_g_node_t toml2_g_tables[] = {
 		{0},
 	}},
 	{ ITABLE_ID, {
-		{ TOML2_TOKEN_IDENTIFIER,    ITABLE_EQUALS,      &toml2_g_name       },
-		{ TOML2_TOKEN_STRING,        ITABLE_EQUALS,      &toml2_g_name       },
-		{ TOML2_TOKEN_NEWLINE,       ITABLE_ID,          NULL                },
+		{ TOML2_TOKEN_IDENTIFIER,    ITABLE_EQUALS,      &toml2_g_name      },
+		{ TOML2_TOKEN_STRING,        ITABLE_EQUALS,      &toml2_g_name      },
+		{ TOML2_TOKEN_INT,           ITABLE_EQUALS,      &toml2_g_name      },
+		{ TOML2_TOKEN_NEWLINE,       ITABLE_ID,          NULL               },
 		{0},
 	}},
 	{ NEWLINE, {
