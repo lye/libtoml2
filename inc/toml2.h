@@ -5,7 +5,6 @@
 #include <time.h>
 
 typedef struct toml2_t toml2_t;
-typedef struct toml2_iter_t toml2_iter_t;
 typedef struct toml2_err_t toml2_err_t;
 typedef enum toml2_type_t toml2_type_t;
 typedef enum toml2_errcode_t toml2_errcode_t;
@@ -158,3 +157,26 @@ size_t toml2_len(toml2_t *node);
 // NULL is returned. NOTE: For tables this is incredibly inefficient; consider
 // using an iterator instead (the entire table is enumerated).
 toml2_t* toml2_index(toml2_t *node, size_t idx);
+
+typedef struct {
+	toml2_t *parent;
+	union {
+		size_t index;
+		toml2_t *next;
+	};
+}
+toml2_iter_t;
+
+// toml2_iter_init initializes an iterator for iteration. If a non-zero
+// value is returned, an error has occured and the iterator cannot be used.
+// Otherwise, the iterator must be freed after use with toml2_iter_free.
+// The toml2_t passed in must remain valid until the iterator is freed.
+int toml2_iter_init(toml2_iter_t *iter, toml2_t *node);
+
+// toml2_iter_next returns the next toml2_t* in the iterated container.
+// The iteration is not recursive -- it only enumerates the keys/indexes
+// in the container the iterator was initialized with.
+toml2_t* toml2_iter_next(toml2_iter_t *iter);
+
+// toml2_iter_free releases any resources held by the iterator.
+void toml2_iter_free(toml2_iter_t *iter);

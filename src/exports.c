@@ -180,3 +180,51 @@ toml2_index(toml2_t *this, size_t idx)
 	}
 	return NULL;
 }
+
+int
+toml2_iter_init(toml2_iter_t *iter, toml2_t *doc)
+{
+	if (TOML2_TABLE == doc->type) {
+		iter->parent = doc;
+		iter->next = RB_MIN(toml2_tree_t, &doc->tree);
+	}
+	else if (TOML2_LIST == doc->type) {
+		iter->parent = doc;
+		iter->index = 0;
+	}
+	else {
+		return 1;
+	}
+
+	return 0;
+}
+
+toml2_t*
+toml2_iter_next(toml2_iter_t *iter)
+{
+	if (TOML2_TABLE == iter->parent->type) {
+		toml2_t *next = iter->next;
+		if (NULL != next) {
+			iter->next = RB_NEXT(toml2_tree_t, &iter->parent->tree, next);
+		}
+		return next;
+	}
+	else if (TOML2_LIST == iter->parent->type) {
+		if (iter->index >= iter->parent->ary_len) {
+			return NULL;
+		}
+
+		toml2_t *next = &iter->parent->ary[iter->index];
+		iter->index += 1;
+		return next;
+	}
+	else {
+		return NULL;
+	}
+}
+
+void
+toml2_iter_free(toml2_iter_t *iter)
+{
+	bzero(iter, sizeof(*iter));
+}
