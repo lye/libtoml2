@@ -92,6 +92,40 @@ START_TEST(err_iter_int)
 }
 END_TEST
 
+START_TEST(diorite)
+{
+	const char *toml = 
+		"[material]\n"
+		"name = \"diorite\"\n"
+		"color = \"A9A9A9\"\n\n"
+		"[render.\"1d\"]\n"
+		"tile = \"16/materials/diorite.png\"";
+	
+	toml2_t doc = check_init(toml);
+	ck_assert_int_eq(
+		TOML2_TABLE,
+		toml2_type(toml2_get_path(&doc, "material"))
+	);
+	ck_assert_int_eq(
+		TOML2_TABLE,
+		toml2_type(toml2_get_path(&doc, "render"))
+	);
+	ck_assert_int_eq(
+		TOML2_TABLE,
+		toml2_type(toml2_get_path(&doc, "render.1d"))
+	);
+	ck_assert_int_eq(
+		TOML2_STRING,
+		toml2_type(toml2_get_path(&doc, "render.1d.tile"))
+	);
+	ck_assert_str_eq(
+		"16/materials/diorite.png",
+		toml2_string(toml2_get_path(&doc, "render.1d.tile"))
+	);
+	toml2_free(&doc);
+}
+END_TEST
+
 Suite*
 suite_exports()
 {
@@ -101,6 +135,7 @@ suite_exports()
 		{ "iter_empty_list",  &iter_empty_list  },
 		{ "iter_empty_table", &iter_empty_table },
 		{ "err_iter_int",     &err_iter_int     },
+		{ "diorite",          &diorite          },
 	};
 
 	return tcase_build_suite("exports", tests, sizeof(tests));

@@ -39,6 +39,14 @@ START_TEST(basic_table)
 }
 END_TEST
 
+START_TEST(undef_table)
+{
+	toml2_t doc = check_init("[foo.bar]\nbaz=42");
+	ck_assert_int_eq(42, toml2_int(toml2_get_path(&doc, "foo.bar.baz")));
+	toml2_free(&doc);
+}
+END_TEST
+
 START_TEST(root_value)
 {
 	toml2_t doc = check_init("int=1\n");
@@ -365,6 +373,7 @@ suite_grammar()
 	tcase_t tests[] = {
 		{ "init_free",             &init_free             },
 		{ "basic_table",           &basic_table           },
+		{ "undef_table",           &undef_table           },
 		{ "root_value",            &root_value            },
 		{ "newlines",              &newlines              },
 		{ "comments",              &comments              },
