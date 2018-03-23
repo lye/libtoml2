@@ -1,6 +1,6 @@
 #!/bin/sh -e
 
-CC=${CC:-clang37}
+CC=${CC:-clang50}
 OBJ_FILES=
 
 if `which ccache > /dev/null 2>&1` ; then

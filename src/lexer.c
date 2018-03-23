@@ -32,7 +32,7 @@ toml2_check_uerr(toml2_lex_t *lex, UErrorCode uerr)
 int
 toml2_lex_init(toml2_lex_t *lex, const char *data, size_t datalen)
 {
-	bzero(lex, sizeof(lex));
+	bzero(lex, sizeof(*lex));
 
 	int32_t srclen = (int32_t) datalen;
 	int32_t dstlen = 0;
